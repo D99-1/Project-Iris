@@ -101,7 +101,7 @@ class Cutscene:
 # interactions and rooms object
 #saatviks code
 items = {}
-items["potato"] = Item("potato","A starchy potato, looks edible.")
+items["potato"] = Item("potato","Its a potato...")
 items["crowbar"] = Item("crowbar","A sturdy iron crowbar, perfect for prying off bolts and nails.")
 items["crate"] = Item("crate","A large crate, it seems to be bolted shut.",requires=["crowbar"],contains=[ items["potato"] ])
 rooms = {
@@ -217,6 +217,7 @@ class Game:
             "use": self.command_use,
             "help": self.command_help,
             "exit": self.command_exit,
+            "inspect": self.command_inspect,
         }
 
     def start(self):
@@ -313,6 +314,21 @@ class Game:
     def command_exit(self, args):
         print("Exiting game.")
         self.running = False
+#saatviks code 
+    def command_inspect(self, args):       
+        if not args:            
+            print("Inspect what?")
+            return
+        item_name = " ".join(args)
+        item = next((i for i in self.player.inventory if i.name.lower() == item_name), None)
+        if not item:
+            room = self.rooms[self.player.current_room]
+            item = next((i for i in room.items if i.name.lower() == item_name), None)
+        if not item:
+            print(f"There is no '{item_name}' here or in your inventory.")
+            return
+        print(item.inspect())
+#end saatviks code 
 
 if __name__ == "__main__":
     player = Player("Player1", rooms)
@@ -325,4 +341,4 @@ if __name__ == "__main__":
     game = Game(player, rooms)
     game.start()
 
-## End Dhyan's Code
+## End Dhyan's Code 
