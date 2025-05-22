@@ -63,12 +63,12 @@ class Player:
 #end saatviks code 
 ## Dhyan's Code
 class Item:
-    def __init__(self, name, description, requires=None, interactions=None):
+    def __init__(self, name, description, requires=None, interactions=None, contains=None):
         self.name = name
         self.description = description
         self.requires = requires
         self.interactions = interactions or {}
-        self.name = contains or []
+        self.contains = contains or []
 #saatviks code       
     def inspect(self):
         if "inspect" in self.interactions:
@@ -100,12 +100,10 @@ class Cutscene:
 
 # interactions and rooms object
 #saatviks code
-items = {
-    "crate": Item("crate", "A large crate, it seems to be bolted shut.", requires=["crowbar"], contains=[items["potato"]]),
-    "crowbar": Item("crowbar","A sturdy iron crowbar, perfect for prying off bolts and nails."),
-    "potato": Item("potato","A normal potato..."), 
-}
-
+items = {}
+items["potato"] = Item("potato","A starchy potato, looks edible.")
+items["crowbar"] = Item("crowbar","A sturdy iron crowbar, perfect for prying off bolts and nails.")
+items["crate"] = Item("crate","A large crate, it seems to be bolted shut.",requires=["crowbar"],contains=[ items["potato"] ])
 rooms = {
     "center": Room(
                     "center", 
@@ -124,7 +122,7 @@ rooms = {
                     "You are in the storage room.", 
                     {"west": "center", "south": "rover_launch_bay"}, 
                     [items["crowbar"]]
-                ),
+                ), 
     "control_room": Room(
                     "control_room", 
                     "You are in the control room.", 
@@ -271,30 +269,41 @@ class Game:
             print("Use what on what?")
             return
         if "on" in args:
-            on_idx = args.index("on")
+            on_idx      = args.index("on")
             item_name   = " ".join(args[:on_idx])
             target_name = " ".join(args[on_idx+1:])
         else:
-            print("Specify what to use and what to use it on.  Syntax: use <item> on <target>")
+            print("Syntax: use <item> on <target>")
             return
-        item_to_use = next((i for i in self.player.inventory if i.name.lower() == item_name), None)
-        if not item_to_use:
+        tool = next((i for i in self.player.inventory if i.name.lower()==item_name), None)
+        if not tool:
             print(f"You don't have an item named '{item_name}'.")
             return
         room = self.rooms[self.player.current_room]
-        target = next((i for i in room.items if i.name.lower() == target_name), None)
+        target = next((i for i in room.items if i.name.lower()==target_name), None)
+        in_inventory = False
         if not target:
-            print(f"There is no '{target_name}' here.")
+            target = next((i for i in self.player.inventory if i.name.lower()==target_name), None)
+            in_inventory = bool(target)
+        if not target:
+            print(f"There is no '{target_name}' here or in your inventory.")
             return
-        if target.requires and item_to_use.name in target.requires:
-            print(f"You used {item_to_use.name} on {target.name}.")
+        if target.requires and tool.name in target.requires:
+            print(f"You used {tool.name} on {target.name}.")
             print(f"{target.name} opens, revealing:")
             for content in target.contains:
-                room.items.append(content)
-                print(f"- {content.name}")
-            room.items.remove(target)
+                if in_inventory:
+                    self.player.inventory.append(content)
+                    print(f"- {content.name} (added to inventory)")
+                else:
+                    room.items.append(content)
+                    print(f"- {content.name} (dropped in the room)")
+            if in_inventory:
+                self.player.inventory.remove(target)
+            else:
+                room.items.remove(target)
             return
-        print(f"Using {item_to_use.name} on {target.name} did nothing.")
+        print(f"Using {tool.name} on {target.name} did nothing.")
 #end saatviks code
     def command_help(self, args):
         print("Available commands:")
