@@ -1,9 +1,6 @@
 ## Dhyan's Code
 import time
 
-#Saatviks Code 
-#end saatviks code 
-
 ## Dhyan's Code
 class Player:
     def __init__(self, name, rooms):
@@ -40,10 +37,9 @@ class Player:
             new_room_name = room.exits[absolute_direction]
             self.current_room = new_room_name
             self.facing_direction = absolute_direction
-            print(f"{self.name} moved {direction} (facing {absolute_direction}) to {self.current_room}")
             print(self.rooms[self.current_room].description)
         else:
-            print(f"Cannot move {direction} ({absolute_direction}) from {self.current_room}")
+            print(f"Cannot move {direction} from {self.current_room}")
 
     def look(self):
         room = self.rooms[self.current_room]
@@ -56,15 +52,14 @@ class Player:
             print("There seems to be no items in this room.")
 
     
-    def view_inventory(self): #allows the player to view their inventory 
+    def view_inventory(self): 
         if not self.inventory:
             print("You currently have no items with you.")
         else:
             print("You are carrying:")
             for item in self.inventory: 
-                print(f"-{item}")
+                print(f"-{item.name}")
 
-    #End Saatvik 
 ## Dhyan's Code
 class Item:
     def __init__(self, name, description, requires=None, interactions=None):
@@ -84,8 +79,7 @@ class Room:
         self.description = description
         self.exits = exits
         self.items = items
-
-        
+      
 class Cutscene:
     def __init__(self, text=[], speed=0.03, lineDelay=1):
         self.text = text
@@ -106,7 +100,6 @@ class Cutscene:
 items = {
     "crate": Item("crate", "A large crate, it seems to be locked.", requires=["key"]),
 }
-
 rooms = {
     "center": Room(
                     "center", 
@@ -206,30 +199,96 @@ rooms = {
                 )
 }
 
+class Game:
+    def __init__(self, player, rooms):
+        self.player = player
+        self.rooms = rooms
+        self.running = True
+        self.commands = {
+            "move": self.command_move,
+            "look": self.command_look,
+            "inventory": self.command_inventory,
+            "take": self.command_take,
+            "pickup": self.command_take,
+            "use": self.command_use,
+            "help": self.command_help,
+            "exit": self.command_exit,
+        }
+
+    def start(self):
+        print(self.rooms[self.player.current_room].description)
+        while self.running:
+            command_input = input("\n> ").strip().lower()
+            self.handle_command(command_input)
+
+    def handle_command(self, command_input):
+        if not command_input:
+            return
+
+        parts = command_input.split()
+        command = parts[0]
+        args = parts[1:]
+
+        if command in self.commands:
+            self.commands[command](args)
+        else:
+            print("Unknown command. Type 'help' for a list of commands.")
+
+    def command_move(self, args):
+        if not args:
+            print("Move where?")
+            return
+        self.player.move(args[0])
+
+    def command_look(self, args):
+        self.player.look()
+
+    def command_inventory(self, args):
+        self.player.view_inventory()
+
+    def command_take(self, args):
+        if not args:
+            print("Take what?")
+            return
+        item_name = " ".join(args)
+        room = self.rooms[self.player.current_room]
+        for item in room.items:
+            if item.name.lower() == item_name:
+                self.player.inventory.append(item)
+                room.items.remove(item)
+                print(f"You picked up the {item.name}.")
+                return
+        print(f"No item named '{item_name}' found here.")
+
+    def command_use(self, args):
+        if not args:
+            print("Use what?")
+            return
+        item_name = " ".join(args)
+        for item in self.player.inventory:
+            if item.name.lower() == item_name:
+                print(f"You used the {item.name}.")
+                return
+        print(f"You don't have an item named '{item_name}'.")
+
+    def command_help(self, args):
+        print("Available commands:")
+        for cmd in self.commands:
+            print(f"- {cmd}")
+
+    def command_exit(self, args):
+        print("Exiting game.")
+        self.running = False
 
 if __name__ == "__main__":
     player = Player("Player1", rooms)
-    intro_cutscene = Cutscene(["You wake up in a spaceship, disoriented and confused. You need to find a way out.", "You look around and see a crate in the center of the room."], speed=0.05, lineDelay=2)
-    intro_cutscene.play()
+    intro = Cutscene([
+        "You wake up in a spaceship, disoriented and confused.",
+        "You look around and see a crate in the center of the room."
+    ], speed=0.05, lineDelay=2)
+    intro.play()
 
-    print(rooms["center"].description)
-
-    while True:
-        command = input("Enter command: ").strip().lower()
-        if command == "exit":
-            break
-        elif command.startswith("move"):
-            parts = command.split()
-            if len(parts) < 2:
-                print("You must specify a direction")
-                continue
-            direction = parts[1]
-            player.move(direction)
-        elif command == "look":
-            player.look()
-        elif command == "inventory":
-            player.view_inventory()
-        else:
-            print("Invalid command")
+    game = Game(player, rooms)
+    game.start()
 
 ## End Dhyan's Code
