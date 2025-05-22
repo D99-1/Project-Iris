@@ -1,14 +1,13 @@
-## Dhyan's Code
 import time
 
-## Dhyan's Code
 class Player:
     def __init__(self, name, rooms):
         self.name = name
         self.rooms = rooms
-        self.current_room = "center"
+        self.current_room = "rover_pad"
         self.inventory = []
         self.facing_direction = "north"
+        self.moves = []
 
     def get_absolute_direction(self, facing, relative_direction):
         direction_aliases = {
@@ -38,9 +37,10 @@ class Player:
             self.current_room = new_room_name
             self.facing_direction = absolute_direction
             print(self.rooms[self.current_room].description)
+            self.moves.append(self.current_room)
         else:
             print(f"Cannot move {direction} from {self.current_room}")
-#saatviks code 
+
     def look(self):
         room = self.rooms[self.current_room]
         print(room.description)
@@ -51,17 +51,14 @@ class Player:
         else:
             print("There seems to be no items in this room.")
 
-    
     def view_inventory(self): 
         if not self.inventory:
             print("You currently have no items with you.")
         else:
             print("You are carrying:")
             for item in self.inventory: 
-                print(f"-{item.name}")
+                print(f"- {item.name}")
 
-#end saatviks code 
-## Dhyan's Code
 class Item:
     def __init__(self, name, description, requires=None, interactions=None, contains=None):
         self.name = name
@@ -69,19 +66,19 @@ class Item:
         self.requires = requires
         self.interactions = interactions or {}
         self.contains = contains or []
-#saatviks code       
+
     def inspect(self):
         if "inspect" in self.interactions:
             return self.interactions["inspect"]
         return self.description
-#end saatviks code
+
 class Room:
     def __init__(self, name, description, exits, items):
         self.name = name
         self.description = description
         self.exits = exits
         self.items = items
-      
+
 class Cutscene:
     def __init__(self, text=[], speed=0.03, lineDelay=1):
         self.text = text
@@ -96,111 +93,42 @@ class Cutscene:
                 print(char, end='', flush=True)
                 time.sleep(self.speed)
             time.sleep(self.lineDelay)
-        print("\n")
+        print("\n\n")
 
-# interactions and rooms object
-#saatviks code
-items = {}
-items["potato"] = Item("potato","Its a potato...")
-items["crowbar"] = Item("crowbar","A sturdy iron crowbar, perfect for prying off bolts and nails.")
-items["crate"] = Item("crate","A large crate, it seems to be bolted shut.",requires=["crowbar"],contains=[ items["potato"] ])
+class GameState:
+    def __init__(self):
+        self.current_act = 1
+        self.log_accessed = False
+        self.iris_found = False
+        self.iris_activated = False
+        self.turns_since_iris = 0
+        self.has_solar_parts = False
+        self.has_beacon = False
+
+items = {
+    "halberg_log": Item("halberg_log", "Encrypted log from Dr. Halberg.", interactions={"inspect": "Iris isn’t dormant. It’s sending something. Somewhere."}),
+    "iris_container": Item("iris_container", "A sealed container labeled: BLACK IRIS – US DEPARTMENT OF DEFENSE.", interactions={"inspect": "UNTESTED SYSTEM – DO NOT ACTIVATE WITHOUT PRIMARY FAILURE\nSIGNAL PROTOCOL: ALPHA-VOID"}),
+    "solar_parts": Item("solar_parts", "Spare solar panel components salvaged from the debris."),
+    "beacon": Item("beacon", "A jury-rigged emergency beacon from an old rover."),
+}
+
 rooms = {
-    "center": Room(
-                    "center", 
-                    "You are in the center of the shipship.", 
-                    {"west": "communications_room", "east": "storage_room", "north": "control_room", "south": "engine_room"}, 
-                    [items["crate"]]
-                ),
-    "communications_room": Room(
-                    "communications_room", 
-                    "You are in the communications room.", 
-                    {"east": "center", "south": "exit_hatch"}, 
-                    []
-                ),
-    "storage_room": Room(
-                    "storage_room", 
-                    "You are in the storage room.", 
-                    {"west": "center", "south": "rover_launch_bay"}, 
-                    [items["crowbar"]]
-                ), 
-    "control_room": Room(
-                    "control_room", 
-                    "You are in the control room.", 
-                    {"south": "center"}, 
-                    []
-                ),
-    "engine_room": Room(
-                    "engine_room", 
-                    "You are in the engine room.", 
-                    {"north": "center", "west": "exit_hatch", "east": "rover_launch_bay"}, 
-                    []
-                ),
-    "rover_launch_bay": Room(
-                    "rover_launch_bay", 
-                    "You are in the rover launch bay.", 
-                    {"north": "storage_room", "west": "engine_room"}, 
-                    []
-                ),
-    "exit_hatch": Room(
-                    "exit_hatch", 
-                    "You are at the exit hatch.", 
-                    {"north": "communications_room", "east": "engine_room"}, 
-                    []
-                ),
-    "open_area": Room(
-                    "open_area", 
-                    "You roam free on the lands of Mars.", 
-                    {"north": "north_debris", "west": "habitat_air_lock", "south": "south_debris", "east": "exit_hatch"}, 
-                    []
-                ),
-    "south_debris": Room(
-                    "south_debris", 
-                    "You are in the south debris area.", 
-                    {"north": "open_area", "west": "habitat_sleeping_quarters", "east": "rover_pad"}, 
-                    []
-                ),
-    "north_debris": Room(
-                    "north_debris", 
-                    "You are in the north debris area.", 
-                    {"south": "open_area", "west": "habitat_storage_room", "east": "old_rover_pad"}, 
-                    []
-                ),
-    "habitat_air_lock": Room(
-                    "habitat_air_lock", 
-                    "You are in the habitat air lock.", 
-                    {"north": "open_area", "south": "habitat_sleeping_quarters"}, 
-                    []
-                ),
-    "habitat_irrigation_area": Room(
-                    "habitat_irrigation_area", 
-                    "You are in the habitat irrigation area.", 
-                    {"north": "habitat_storage_room", "south": "habitat_air_lock"}, 
-                    []
-                ),
-    "habitat_sleeping_quarters": Room(
-                    "habitat_sleeping_quarters", 
-                    "You are in the habitat sleeping quarters.", 
-                    {"north": "habitat_air_lock", "east": "south_debris"}, 
-                    []
-                ),
-    "habitat_storage_room": Room(
-                    "habitat_storage_room", 
-                    "You are in the habitat storage room.", 
-                    {"south": "habitat_irrigation_area", "east": "north_debris"}, 
-                    []
-                ),
-    "rover_pad": Room(
-                    "rover_pad", 
-                    "You are in the rover pad.", 
-                    {"west": "south_debris"}, 
-                    []
-                ),
-    "old_rover_pad": Room(
-                    "old_rover_pad", 
-                    "You are in the old rover pad.", 
-                    {"west": "north_debris"}, 
-                    []
-                )
+    "center": Room("center", "You are in the center of the ship.", {"west": "communications_room", "east": "storage_room", "north": "control_room", "south": "engine_room"}, []),
+    "communications_room": Room("communications_room", "You are in the communications room.", {"east": "center", "south": "exit_hatch"}, []),
+    "storage_room": Room("storage_room", "You are in the storage room.", {"west": "center", "south": "rover_launch_bay"}, []), 
+    "control_room": Room("control_room", "You are in the control room.", {"south": "center"}, [items["halberg_log"]]),
+    "engine_room": Room("engine_room", "You are in the engine room.", {"north": "center", "west": "exit_hatch", "east": "rover_launch_bay"}, []),
+    "rover_launch_bay": Room("rover_launch_bay", "You are in the rover launch bay.", {"north": "storage_room", "west": "engine_room"}, []),
+    "exit_hatch": Room("exit_hatch", "You are at the exit hatch.", {"north": "communications_room", "east": "engine_room"}, []),
+    "open_area": Room("open_area", "You roam free on the lands of Mars.", {"north": "north_debris", "west": "habitat_air_lock", "south": "south_debris", "east": "exit_hatch"}, []),
+    "south_debris": Room("south_debris", "You are in the south debris area.", {"north": "open_area", "west": "habitat_sleeping_quarters", "east": "rover_pad"}, [items["solar_parts"]]),
+    "north_debris": Room("north_debris", "You are in the north debris area.", {"south": "open_area", "west": "habitat_storage_room", "east": "old_rover_pad"}, [items["iris_container"]]),
+    "habitat_air_lock": Room("habitat_air_lock", "You are in the habitat air lock.", {"north": "open_area", "south": "habitat_sleeping_quarters"}, []),
+    "habitat_irrigation_area": Room("habitat_irrigation_area", "You are in the habitat irrigation area.", {"north": "habitat_storage_room", "south": "habitat_air_lock"}, []),
+    "habitat_sleeping_quarters": Room("habitat_sleeping_quarters", "You are in the habitat sleeping quarters.", {"north": "habitat_air_lock", "east": "south_debris"}, []),
+    "habitat_storage_room": Room("habitat_storage_room", "You are in the habitat storage room.", {"south": "habitat_irrigation_area", "east": "north_debris"}, []),
+    "rover_pad": Room("rover_pad", "You are in the rover pad.", {"north": "rover_launch_bay"}, []),
+    "old_rover_pad": Room("old_rover_pad", "You are in the old rover pad.", {"west": "north_debris"}, [items["beacon"]]),
 }
 
 class Game:
@@ -225,6 +153,12 @@ class Game:
         while self.running:
             command_input = input("\n> ").strip().lower()
             self.handle_command(command_input)
+            if len(player.moves) == 3:
+                Cutscene([
+                    "The dust storm sure hit hard...",
+                    "You should probably check if something is damaged outside,",
+                    "try exiting through the airlock."
+                ], speed=0.03, lineDelay=2).play()
 
     def handle_command(self, command_input):
         if not command_input:
@@ -270,29 +204,34 @@ class Game:
             print("Use what on what?")
             return
         if "on" in args:
-            on_idx      = args.index("on")
-            item_name   = " ".join(args[:on_idx])
+            on_idx = args.index("on")
+            item_name = " ".join(args[:on_idx])
             target_name = " ".join(args[on_idx+1:])
         else:
             print("Syntax: use <item> on <target>")
             return
-        tool = next((i for i in self.player.inventory if i.name.lower()==item_name), None)
+
+        tool = next((i for i in self.player.inventory if i.name.lower() == item_name), None)
         if not tool:
             print(f"You don't have an item named '{item_name}'.")
             return
+
         room = self.rooms[self.player.current_room]
-        target = next((i for i in room.items if i.name.lower()==target_name), None)
+        target = next((i for i in room.items if i.name.lower() == target_name), None)
         in_inventory = False
         if not target:
-            target = next((i for i in self.player.inventory if i.name.lower()==target_name), None)
+            target = next((i for i in self.player.inventory if i.name.lower() == target_name), None)
             in_inventory = bool(target)
+
         if not target:
             print(f"There is no '{target_name}' here or in your inventory.")
             return
+
         if target.requires and tool.name in target.requires:
             print(f"You used {tool.name} on {target.name}.")
             print(f"{target.name} opens, revealing:")
-            for content in target.contains:
+            for content_name in target.contains:
+                content = items[content_name]
                 if in_inventory:
                     self.player.inventory.append(content)
                     print(f"- {content.name} (added to inventory)")
@@ -304,7 +243,9 @@ class Game:
             else:
                 room.items.remove(target)
             return
+
         print(f"Using {tool.name} on {target.name} did nothing.")
+
 #end saatviks code
     def command_help(self, args):
         print("Available commands:")
@@ -333,9 +274,10 @@ class Game:
 if __name__ == "__main__":
     player = Player("Player1", rooms)
     intro = Cutscene([
-        "You wake up in a spaceship, disoriented and confused.",
-        "You look around and see a crate in the center of the room."
-    ], speed=0.05, lineDelay=2)
+    "Sol 37. The storm hit harder than anything predicted.",
+    "The habitat collapsed. You're the only one who made it to the rover in time.",
+    "Power is out. Oxygen is dropping. You have to get back inside..."
+    ], speed=0.04, lineDelay=2)
     intro.play()
 
     game = Game(player, rooms)
