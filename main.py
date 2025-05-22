@@ -40,7 +40,7 @@ class Player:
             print(self.rooms[self.current_room].description)
         else:
             print(f"Cannot move {direction} from {self.current_room}")
-
+#saatviks code 
     def look(self):
         room = self.rooms[self.current_room]
         print(room.description)
@@ -60,6 +60,7 @@ class Player:
             for item in self.inventory: 
                 print(f"-{item.name}")
 
+#end saatviks code 
 ## Dhyan's Code
 class Item:
     def __init__(self, name, description, requires=None, interactions=None):
@@ -67,12 +68,12 @@ class Item:
         self.description = description
         self.requires = requires
         self.interactions = interactions or {}
-        
+#saatviks code       
     def inspect(self):
         if "inspect" in self.interactions:
             return self.interactions["inspect"]
         return self.description
-
+#end saatviks code
 class Room:
     def __init__(self, name, description, exits, items):
         self.name = name
@@ -97,9 +98,12 @@ class Cutscene:
         print("\n")
 
 # interactions and rooms object
+#saatviks code
 items = {
-    "crate": Item("crate", "A large crate, it seems to be locked.", requires=["key"]),
+    "crate": Item("crate", "A large crate, it seems to be bolted shut.", requires=["crowbar"]),
+    "crowbar": Item("crowbar","A sturdy iron crowbar, perfect for prying off bolts and nails."),
 }
+
 rooms = {
     "center": Room(
                     "center", 
@@ -117,7 +121,7 @@ rooms = {
                     "storage_room", 
                     "You are in the storage room.", 
                     {"west": "center", "south": "rover_launch_bay"}, 
-                    []
+                    [items["crowbar"]]
                 ),
     "control_room": Room(
                     "control_room", 
@@ -259,18 +263,26 @@ class Game:
                 print(f"You picked up the {item.name}.")
                 return
         print(f"No item named '{item_name}' found here.")
-
+#saatviks code
     def command_use(self, args):
         if not args:
             print("Use what?")
             return
-        item_name = " ".join(args)
-        for item in self.player.inventory:
-            if item.name.lower() == item_name:
-                print(f"You used the {item.name}.")
+        item_name = " ".join(args)     
+        item_to_use = next((item for item in self.player.inventory if item.name.lower() == item_name), None)
+        if not item_to_use:
+            print(f"You don't have an item named '{item_name}'.")
+            return
+        current_room = self.rooms[self.player.current_room]
+        for room_item in current_room.items:
+            if room_item.requires and item_to_use.name in room_item.requires:
+                print(f"You used {item_to_use.name} on {room_item.name}.")
+                print(f"{room_item.name} opens or changes in some way.")
+                current_room.items.remove(room_item)
                 return
-        print(f"You don't have an item named '{item_name}'.")
+        print(f"You used the {item_to_use.name}, but nothing happened.")
 
+#end saatviks code
     def command_help(self, args):
         print("Available commands:")
         for cmd in self.commands:
