@@ -8,6 +8,9 @@ class Player:
         self.inventory = []
         self.facing_direction = "north"
         self.moves = []
+        self.flags = {
+            "comms_unlocked": False,
+        }
 
     def get_absolute_direction(self, facing, relative_direction):
         direction_aliases = {
@@ -34,6 +37,16 @@ class Player:
 
         if absolute_direction in room.exits:
             new_room_name = room.exits[absolute_direction]
+
+            if new_room_name == "communications_room" and not self.flags.get("comms_unlocked"):
+                code = input("A keypad flashes: ENTER ACCESS CODE >> ").strip().upper()
+                if code == "EMBER-IRIS-8924":
+                    print("Access granted. The door slides open.")
+                    self.flags["comms_unlocked"] = True
+                else:
+                    print("Access denied. The door remains sealed.")
+                    return
+                
             self.current_room = new_room_name
             self.facing_direction = absolute_direction
             print(self.rooms[self.current_room].description)
@@ -110,13 +123,14 @@ items = {
     "iris_container": Item("iris_container", "A sealed container labeled: BLACK IRIS – US DEPARTMENT OF DEFENSE.", interactions={"inspect": "UNTESTED SYSTEM – DO NOT ACTIVATE WITHOUT PRIMARY FAILURE\nSIGNAL PROTOCOL: ALPHA-VOID"}),
     "solar_parts": Item("solar_parts", "Spare solar panel components salvaged from the debris."),
     "beacon": Item("beacon", "A jury-rigged emergency beacon from an old rover."),
+    "sticky_note": Item("sticky_note", "A dusty yellow sticky-note, stuck onto the side panel near Dr. Halberg's seat", interactions={'inspect': "\"don't forget the password!\nEMBER-IRIS-8924\n     — Halberg\""})
 }
 
 rooms = {
     "center": Room("center", "You are in the center of the ship.", {"west": "communications_room", "east": "storage_room", "north": "control_room", "south": "engine_room"}, []),
     "communications_room": Room("communications_room", "You are in the communications room.", {"east": "center", "south": "exit_hatch"}, []),
     "storage_room": Room("storage_room", "You are in the storage room.", {"west": "center", "south": "rover_launch_bay"}, []), 
-    "control_room": Room("control_room", "You are in the control room.", {"south": "center"}, [items["halberg_log"]]),
+    "control_room": Room("control_room", "You are in the control room.", {"south": "center"}, [items["sticky_note"]]),
     "engine_room": Room("engine_room", "You are in the engine room.", {"north": "center", "west": "exit_hatch", "east": "rover_launch_bay"}, []),
     "rover_launch_bay": Room("rover_launch_bay", "You are in the rover launch bay.", {"north": "storage_room", "west": "engine_room"}, []),
     "exit_hatch": Room("exit_hatch", "You are at the exit hatch.", {"north": "communications_room", "east": "engine_room"}, []),
