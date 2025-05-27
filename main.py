@@ -46,7 +46,56 @@ class Player:
                 else:
                     print("Access denied. The door remains sealed.")
                     return
-                
+            elif new_room_name == "exit_hatch" and not room.name == "open_area":
+                confirm = input("You are about to exit the rover. Are you sure? (yes/no) ").strip().lower()
+                if confirm != "yes":
+                    print("You decide to stay inside the rover.")
+                    return
+                else:
+                    cutscene = Cutscene([
+                        "Depressurising the airlock...",
+                    ], speed=0.5, lineDelay=1)
+                    cutscene.play()
+                    self.current_room = "open_area"
+                    self.facing_direction = "west"
+                    self.moves.append(self.current_room)
+                    print(self.rooms[self.current_room].description)
+                    self.flags["three_move_cutscene_played"] = True
+                    return
+            elif new_room_name == "exit_hatch" and room.name == "open_area":
+                confirm = input("You are about to enter the spaceship. Are you sure? (yes/no) ").strip().lower()
+                if confirm != "yes":
+                    print("You decide to stay outside.")
+                    return
+                else:
+                    cutscene = Cutscene([
+                        "Entering the spaceship...",
+                    ], speed=0.5, lineDelay=1)
+                    cutscene.play()
+                    self.current_room = "exit_hatch"
+                    self.facing_direction = "east"
+                    self.moves.append(self.current_room)
+                    print(self.rooms[self.current_room].description)
+                    return
+            elif new_room_name == "habitat_sleeping_quarters" and not self.flags.get("sleeping_quarters_visited"):
+                cutscene = Cutscene([
+                    "You enter the habitat's sleeping quarters.",
+                    "It looks like a mess, the wall is missing.",
+                    "Outside, you see the ruins of the habitat."
+                ], speed=0.04, lineDelay=2)
+                cutscene.play()
+                self.flags["sleeping_quarters_visited"] = True
+            elif new_room_name == "habitat_storage_room" and not self.flags.get("storage_room_visited"):
+                cutscene = Cutscene([
+                    "You enter the habitat's storage room.",
+                    "It's not storing anything anymore",
+                    "just the dusty remains of what used to be here.",
+                    "The wall no longer exists",
+                    "Outside, you see a pile of debris."
+                ], speed=0.04, lineDelay=2)
+                cutscene.play()
+                self.flags["storage_room_visited"] = True
+
             self.current_room = new_room_name
             self.facing_direction = absolute_direction
             print(self.rooms[self.current_room].description)
@@ -120,9 +169,6 @@ class GameState:
 
 items = {
     "halberg_log": Item("halberg_log", "Encrypted log from Dr. Halberg.", interactions={"inspect": "Iris isn’t dormant. It’s sending something. Somewhere."}),
-    "iris_container": Item("iris_container", "A sealed container labeled: BLACK IRIS – US DEPARTMENT OF DEFENSE.", interactions={"inspect": "UNTESTED SYSTEM – DO NOT ACTIVATE WITHOUT PRIMARY FAILURE\nSIGNAL PROTOCOL: ALPHA-VOID"}),
-    "solar_parts": Item("solar_parts", "Spare solar panel components salvaged from the debris."),
-    "beacon": Item("beacon", "A jury-rigged emergency beacon from an old rover."),
     "sticky_note": Item("sticky_note", "A dusty yellow sticky-note, stuck onto the side panel near Dr. Halberg's seat", interactions={'inspect': "\"don't forget the password!\nEMBER-IRIS-8924\n     — Halberg\""})
 }
 
@@ -135,14 +181,14 @@ rooms = {
     "rover_launch_bay": Room("rover_launch_bay", "You are in the rover launch bay.", {"north": "storage_room", "west": "engine_room"}, []),
     "exit_hatch": Room("exit_hatch", "You are at the exit hatch.", {"north": "communications_room", "east": "engine_room"}, []),
     "open_area": Room("open_area", "You roam free on the lands of Mars.", {"north": "north_debris", "west": "habitat_air_lock", "south": "south_debris", "east": "exit_hatch"}, []),
-    "south_debris": Room("south_debris", "You are in the south debris area.", {"north": "open_area", "west": "habitat_sleeping_quarters", "east": "rover_pad"}, [items["solar_parts"]]),
-    "north_debris": Room("north_debris", "You are in the north debris area.", {"south": "open_area", "west": "habitat_storage_room", "east": "old_rover_pad"}, [items["iris_container"]]),
-    "habitat_air_lock": Room("habitat_air_lock", "You are in the habitat air lock.", {"north": "open_area", "south": "habitat_sleeping_quarters"}, []),
+    "south_debris": Room("south_debris", "You are in the south debris area.", {"north": "open_area", "west": "habitat_sleeping_quarters"}, []),
+    "north_debris": Room("north_debris", "You are in the north debris area.", {"south": "open_area", "west": "habitat_storage_room", "east": "old_rover_pad"}, []),
+    "habitat_air_lock": Room("habitat_air_lock", "You are in the habitat air lock.", {"north": "habitat_irrigation_area", "south": "habitat_sleeping_quarters"}, []),
     "habitat_irrigation_area": Room("habitat_irrigation_area", "You are in the habitat irrigation area.", {"north": "habitat_storage_room", "south": "habitat_air_lock"}, []),
     "habitat_sleeping_quarters": Room("habitat_sleeping_quarters", "You are in the habitat sleeping quarters.", {"north": "habitat_air_lock", "east": "south_debris"}, []),
     "habitat_storage_room": Room("habitat_storage_room", "You are in the habitat storage room.", {"south": "habitat_irrigation_area", "east": "north_debris"}, []),
     "rover_pad": Room("rover_pad", "You are in the rover pad.", {"north": "rover_launch_bay"}, []),
-    "old_rover_pad": Room("old_rover_pad", "You are in the old rover pad.", {"west": "north_debris"}, [items["beacon"]]),
+    "old_rover_pad": Room("old_rover_pad", "You are in the old rover pad.", {"west": "north_debris"}, []),
 }
 
 class Game:
@@ -167,12 +213,14 @@ class Game:
         while self.running:
             command_input = input("\n> ").strip().lower()
             self.handle_command(command_input)
-            if len(player.moves) == 3:
+            if len(self.player.moves) == 3 and not self.player.flags.get("three_move_cutscene_played"):
                 Cutscene([
                     "The dust storm sure hit hard...",
                     "You should probably check if something is damaged outside,",
                     "try exiting through the airlock."
                 ], speed=0.03, lineDelay=2).play()
+                self.player.flags["three_move_cutscene_played"] = True
+            
 
     def handle_command(self, command_input):
         if not command_input:
