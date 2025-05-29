@@ -168,10 +168,17 @@ class GameState:
         self.has_beacon = False
 
 items = {
-    "halberg_log": Item("halberg_log", "Encrypted log from Dr. Halberg.", interactions={"inspect": "Iris isn’t dormant. It’s sending something. Somewhere."}),
-    "sticky_note": Item("sticky_note", "A dusty yellow sticky-note, stuck onto the side panel near Dr. Halberg's seat", interactions={'inspect': "\"don't forget the password!\nEMBER-IRIS-8924\n     — Halberg\""})
+    "halberg_log": Item("Halberg's Log", "Encrypted log from Dr. Halberg.", interactions={"inspect": "Iris isn’t dormant. It’s sending something. Somewhere."}),
+    "sticky_note": Item("Sticky Note", "A dusty yellow sticky-note, stuck onto the side panel near Dr. Halberg's seat", interactions={'inspect': "\"don't forget the password!\nEMBER-IRIS-8924\n     — Halberg\""}),
+    "mre": Item("MRE's", "A pack of MRE's (Meals Ready to Eat).", interactions={"inspect": "These will keep you fed for a while."}),
+    "old_air_filter": Item("Old Air Filter", "An old air filter, covered in dust.", interactions={"inspect": "It looks like it hasn't been used in a long time."}),
+    "empty_containers": Item("Empty Containers", "A few empty containers, likely used for storage.", interactions={"inspect": "They are empty and useless now."}),
+    "north_metal_scraps": Item("Metal Scraps", "A pile of metal scraps", interactions={"inspect": "These could be useful for repairs."}),
+    "sealed_briefcase": Item("Sealed Briefcase", "Sealed Black Briefcase with an embossed US government seal",interactions={"inspect": "It seems to be locked with a rusty padlock. No key in sight."},requires=["Rusty Spanner"],contains=["iris"]),
+    "rusty_spanner": Item("Rusty Spanner", "A rusty spanner.", interactions={"inspect": "It might still be useful for some repairs."}),
+    "torn_clothing": Item("Torn Clothing", "A pile of ripped clothes", interactions={"inspect": "This doesn't look like it's useful anymore."}),
+    "iris": Item("Iris", "A small large black box with a small screen and a few buttons. It seems to be some kind of device.", interactions={"inspect":"There is a handbook attached to the device. It reads:\n\nIRIS: STRICTLY CONFIDENTIAL\n\nFOR AUTHORISED PERSONNEL ONLY\n\nDO NOT ATTEMPT TO ACCESS WITHOUT PROPER AUTHORISATION\n\n-------------------------\n\nIRIS is a self-regulating, life support system designed to preserve designated subjects indefinitely in the event of catastrophic failure in hostile environments.\n\nOnce activated, IRIS *will* take care of you, however IRIS remains a prototype at this stage\n\nThere are known tendencies for IRIS to emit unintended UHF signals, known to cause interterstrial interference and potentially attract extraterrestrial attention.\n\nAT THIS POINT IN TIME, IRIS IS NOT TO BE ACTIVATED, RISK OF FAILURE REMAINS TOO HIGH."}),
 }
-
 rooms = {
     "center": Room("center", "You are in the center of the ship.", {"west": "communications_room", "east": "storage_room", "north": "control_room", "south": "engine_room"}, []),
     "communications_room": Room("communications_room", "You are in the communications room.", {"east": "center", "south": "exit_hatch"}, []),
@@ -182,7 +189,7 @@ rooms = {
     "exit_hatch": Room("exit_hatch", "You are at the exit hatch.", {"north": "communications_room", "east": "engine_room"}, []),
     "open_area": Room("open_area", "You roam free on the lands of Mars.", {"north": "north_debris", "west": "habitat_air_lock", "south": "south_debris", "east": "exit_hatch"}, []),
     "south_debris": Room("south_debris", "You are in the south debris area.", {"north": "open_area", "west": "habitat_sleeping_quarters"}, []),
-    "north_debris": Room("north_debris", "You are in the north debris area.", {"south": "open_area", "west": "habitat_storage_room", "east": "old_rover_pad"}, []),
+    "north_debris": Room("north_debris", "You are in the north debris area.", {"south": "open_area", "west": "habitat_storage_room", "east": "old_rover_pad"}, [items["mre"], items["old_air_filter"], items["north_metal_scraps"], items["empty_containers"], items["sealed_briefcase"], items["torn_clothing"], items["rusty_spanner"]]),
     "habitat_air_lock": Room("habitat_air_lock", "You are in the habitat air lock.", {"north": "habitat_irrigation_area", "south": "habitat_sleeping_quarters"}, []),
     "habitat_irrigation_area": Room("habitat_irrigation_area", "You are in the habitat irrigation area.", {"north": "habitat_storage_room", "south": "habitat_air_lock"}, []),
     "habitat_sleeping_quarters": Room("habitat_sleeping_quarters", "You are in the habitat sleeping quarters.", {"north": "habitat_air_lock", "east": "south_debris"}, []),
