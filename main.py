@@ -10,6 +10,8 @@ class Player:
         self.moves = []
         self.flags = {
             "comms_unlocked": False,
+            "old_rover_alive": True,
+            "has_working_antenna": False,
         }
 
     def get_absolute_direction(self, facing, relative_direction):
@@ -103,6 +105,16 @@ class Player:
                 ], speed=0.04, lineDelay=2)
                 cutscene.play()
                 self.flags["storage_room_visited"] = True
+            elif new_room_name == "old_rover_pad" and self.flags.get("old_rover_alive"):
+                cutscene = Cutscene([
+                    "You approach the Old Rover.",
+                    "It looks battered, but its antenna is intact.",
+                    "You can hear a faint hum as you get closer."
+                ], speed=0.04, lineDelay=2)
+                cutscene.play()
+
+                Cutscene(old_rover.dialogue, speed=0.04, lineDelay=2).play()
+                old_rover.interaction()
 
             self.current_room = new_room_name
             self.facing_direction = absolute_direction
@@ -140,7 +152,6 @@ class Item:
     def inspect(self):
         if "inspect" in self.interactions:
             return self.interactions["inspect"]
-        return self.description
 
 class Room:
     def __init__(self, name, description, exits, items):
@@ -165,6 +176,61 @@ class Cutscene:
             time.sleep(self.lineDelay)
         print("\n\n")
 
+class NPC:
+    def __init__(self, name, description, dialogue, interaction):
+        self.name = name
+        self.description = description
+        self.dialogue = dialogue
+        self.interaction = interaction
+
+def interact_old_rover(player):
+    lines = [
+        "The Old Rover lowers its voice module to a faint whisper.",
+        "Old Rover: You need the antenna, don't you?",
+        "Old Rover: If you take it... I will go dark.",
+        "Old Rover: But maybe... maybe it's time.",
+        "",
+        "What do you do?",
+        "1. Harvest the antenna",
+        "2. Leave Old Rover intact"
+    ]
+    Cutscene(lines).play()
+
+    choice = input("> ").strip()
+
+    if choice == "1":
+        Cutscene([
+            "You reach out slowly, disconnecting the antenna.",
+            "Old Rover: I knew this day would come.",
+            "The lights on its sensors fade.",
+            "You now have the beacon antenna.",
+            "Try using the emergency beacon in the communications room."
+        ]).play()
+        player.flags["old_rover_alive"] = False
+        player.inventory.append(items["antenna"])
+        player.inventory.append(items["emergency_beacon"])
+    elif choice == "2":
+        Cutscene([
+            "You step back. The Old Rover's sensors flash briefly.",
+            "The rover gets back to it's exploration, as it has done for so long."
+        ]).play()
+        player.flags["old_rover_alive"] = True
+    else:
+        Cutscene(["Invalid choice."]).play()
+        interact_old_rover()
+
+
+old_rover = NPC(
+    name="Old Rover",
+    description="A battered exploration unit with an intact antenna. It hums faintly as you approach.",
+    dialogue=[
+        "Old Rover: I remember this crater. Dust storms used to dance here like children.",
+        "Old Rover: Most of my memory banks are corrupted... but I remember the stars.",
+        "Old Rover: My antenna still works... keeps me connected to the sky."
+    ],
+    interaction=lambda: interact_old_rover(player)
+)
+
 class GameState:
     def __init__(self):
         self.current_act = 1
@@ -184,16 +250,17 @@ items = {
     "sealed_briefcase": Item("Sealed Briefcase", "Sealed Black Briefcase with an embossed US government seal",interactions={"inspect": "It seems to be locked with a rusty padlock. No key in sight."},requires=["Rusty Spanner"],contains=["iris"]),
     "rusty_spanner": Item("Rusty Spanner", "A rusty spanner.", interactions={"inspect": "It might still be useful for some repairs."}),
     "torn_clothing": Item("Torn Clothing", "A pile of ripped clothes", interactions={"inspect": "This doesn't look like it's useful anymore."}),
-    "iris": Item("Iris", "A small large black box with a small screen and a few buttons. It seems to be some kind of device.", interactions={"inspect":"There is a handbook attached to the device. It reads:\n\nIRIS: STRICTLY CONFIDENTIAL\n\nFOR AUTHORISED PERSONNEL ONLY\n\nDO NOT ATTEMPT TO ACCESS WITHOUT PROPER AUTHORISATION\n\n-------------------------\n\nIRIS is a self-regulating, life support system designed to preserve designated subjects indefinitely in the event of catastrophic failure in hostile environments.\n\nOnce activated, IRIS *will* take care of you, however IRIS remains a prototype at this stage\n\nThere are known tendencies for IRIS to emit unintended UHF signals, known to cause interterstrial interference and potentially attract extraterrestrial attention.\n\nAT THIS POINT IN TIME, IRIS IS NOT TO BE ACTIVATED, RISK OF FAILURE REMAINS TOO HIGH."}),
+    "iris": Item("Iris", "A small large black box with a small screen and a few buttons. It seems to be some kind of device.", interactions={"inspect":"There is a handbook attached to the device. It reads:\n\nIRIS: STRICTLY CONFIDENTIAL\n\nFOR AUTHORISED PERSONNEL ONLY\n\nDO NOT ATTEMPT TO ACCESS WITHOUT PROPER AUTHORISATION\n\n-------------------------\n\nIRIS is a self-regulating, life support system designed to preserve designated subjects indefinitely in the event of catastrophic failure in hostile environments.\n\nOnce activated, IRIS *will* take care of you, however IRIS remains a prototype at this stage\n\nThere are known tendencies for IRIS to emit unintended UHF signals, known to cause interterrestrial interference and potentially attract extraterrestrial attention.\n\nAT THIS POINT IN TIME, IRIS IS NOT TO BE ACTIVATED, RISK OF FAILURE REMAINS TOO HIGH."}),
     "headphones": Item("Headphones", "A good old pair of wired headphones.", interactions={"inspect": "These were probably used to communicate with earth."}),
     "radio": Item("Radio", "A small radio device, likely used for communication.", interactions={"inspect": "It seems to be broken, doesn't look like it's in a repairable condition."}),
     "emergency_beacon": Item("Emergency Beacon", "A small emergency beacon, used to signal for help.", interactions={"inspect": "This could be useful to call back to Earth for help. You need a working antenna to activate this."}),
     "broken_antenna": Item("Broken Antenna", "A broken antenna, likely used for communication.", interactions={"inspect": "It seems to be damaged beyond repair. This would've been used to activate the emergency beacon."}),
-    "communications_manual": Item("Communications Manual", "A manual for the communications system.", interactions={"inspect": "Communications Manual: \n\nThis manual contains information on how to operate the communications system, including troubleshooting steps for common issues.\n\n To activate general communications, press the green 'Power' button on the console and tune frequency to 145.800 MHz, fine-tune as required.\n\n For emergency communications, use the dedicated emergency beacon"}),
+    "communications_manual": Item("Communications Manual", "A manual for the communications system.", interactions={"inspect": "Communications Manual: \n\nThis manual contains information on how to operate the communications system, including troubleshooting steps for common issues:\n\n To activate general communications, press the green 'Power' button on the console and tune frequency to 145.800 MHz, fine-tune as required.\n\n For emergency communications, use the dedicated emergency beacon.\nAttach the portable antenna to the beacon and hold the red button for 5 seconds, a blue light should activate.\nOnce the singal is received by earth, a green light will activate.\nThe beacon will display a red light if an antenna is not attached.\n\n\nThe light is red indeed, you need an antenna.\nThe antenna that's laying around here is broken. Where can you possibly find a working antenna?\nMaybe the old rovers that are active from the previous mission may have some.\nThe old mission was North of our spaceship."}),
+    "antenna": Item("Antenna", "A working antenna, used to activate the emergency beacon.", interactions={"inspect": "This antenna is in good condition and can be used to activate the emergency beacon."}),
 }
 rooms = {
     "center": Room("center", "You are in the center of the ship.", {"west": "communications_room", "east": "storage_room", "north": "control_room", "south": "engine_room"}, []),
-    "communications_room": Room("communications_room", "You are in the communications room.", {"east": "center", "south": "exit_hatch"}, [items["headphones"], items["broken_antenna"], items["radio"], items["emergency_beacon"]]),
+    "communications_room": Room("communications_room", "You are in the communications room.", {"east": "center", "south": "exit_hatch"}, [items["headphones"], items["broken_antenna"], items["radio"], items["emergency_beacon"], items["communications_manual"]]),
     "storage_room": Room("storage_room", "You are in the storage room.", {"west": "center", "south": "rover_launch_bay"}, []), 
     "control_room": Room("control_room", "You are in the control room.", {"south": "center"}, [items["sticky_note"]]),
     "engine_room": Room("engine_room", "You are in the engine room.", {"north": "center", "west": "exit_hatch", "east": "rover_launch_bay"}, []),
