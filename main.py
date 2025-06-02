@@ -77,6 +77,14 @@ class Player:
                     self.moves.append(self.current_room)
                     print(self.rooms[self.current_room].description)
                     return
+            elif new_room_name == "habitat_air_lock" and not self.flags.get("habitat_air_lock_visited"):
+                cutscene = Cutscene([
+                    "You open the airlock of the habitat.",
+                    "It opens easily, no pressure difference.",
+                    "There must be a leak somewhere."
+                ], speed=0.04, lineDelay=2)
+                cutscene.play()
+                self.flags["habitat_air_lock_visited"] = True
             elif new_room_name == "habitat_sleeping_quarters" and not self.flags.get("sleeping_quarters_visited"):
                 cutscene = Cutscene([
                     "You enter the habitat's sleeping quarters.",
@@ -181,6 +189,7 @@ items = {
     "radio": Item("Radio", "A small radio device, likely used for communication.", interactions={"inspect": "It seems to be broken, doesn't look like it's in a repairable condition."}),
     "emergency_beacon": Item("Emergency Beacon", "A small emergency beacon, used to signal for help.", interactions={"inspect": "This could be useful to call back to Earth for help. You need a working antenna to activate this."}),
     "broken_antenna": Item("Broken Antenna", "A broken antenna, likely used for communication.", interactions={"inspect": "It seems to be damaged beyond repair. This would've been used to activate the emergency beacon."}),
+    "communications_manual": Item("Communications Manual", "A manual for the communications system.", interactions={"inspect": "Communications Manual: \n\nThis manual contains information on how to operate the communications system, including troubleshooting steps for common issues.\n\n To activate general communications, press the green 'Power' button on the console and tune frequency to 145.800 MHz, fine-tune as required.\n\n For emergency communications, use the dedicated emergency beacon"}),
 }
 rooms = {
     "center": Room("center", "You are in the center of the ship.", {"west": "communications_room", "east": "storage_room", "north": "control_room", "south": "engine_room"}, []),
