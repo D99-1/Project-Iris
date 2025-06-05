@@ -1,5 +1,8 @@
 import time
-import os #Add personalised ending message with user's name
+
+class GameError(Exception):
+    # custom exception for errors
+    pass
 
 class Player:
     def __init__(self, name, rooms):
@@ -16,31 +19,52 @@ class Player:
         }
 
     def get_absolute_direction(self, facing, relative_direction):
-        direction_aliases = {
-            "front": {"front","forward", "f", "forwards", "frontward"},
-            "back": {"back", "backward", "b", "backwards", "backward"},
-            "left": {"left", "l"},
-            "right": {"right", "r"},
-        }
-        for key, aliases in direction_aliases.items():
-            if relative_direction in aliases:
-                relative_direction = key
-                break
-        else:
-            raise ValueError(f"Invalid direction: {relative_direction}")
-        directions = ["north", "east", "south", "west"]
-        offsets = {"front": 0, "right": 1, "back": 2, "left": -1}
-        facing_index = directions.index(facing)
-        abs_index = (facing_index + offsets[relative_direction]) % 4
-        return directions[abs_index]
+        try:
+            direction_aliases = {
+                "front": {"front","forward", "f", "forwards", "frontward"},
+                "back": {"back", "backward", "b", "backwards", "backward"},
+                "left": {"left", "l"},
+                "right": {"right", "r"},
+            }
+            
+            # Find matching direction
+            for key, aliases in direction_aliases.items():
+                if relative_direction in aliases:
+                    relative_direction = key
+                    break
+            else:
+                raise GameError(f"Invalid direction: {relative_direction}")
+            
+            directions = ["north", "east", "south", "west"]
+            offsets = {"front": 0, "right": 1, "back": 2, "left": -1}
+            
+            if facing not in directions:
+                raise GameError(f"Invalid facing direction: {facing}")
+            
+            facing_index = directions.index(facing)
+            abs_index = (facing_index + offsets[relative_direction]) % 4
+            return directions[abs_index]
+            
+        except Exception as e:
+            raise GameError(f"Direction calculation failed: {str(e)}")
 
     def move(self, direction):
-        room = self.rooms[self.current_room]
-        absolute_direction = self.get_absolute_direction(self.facing_direction, direction)
+        try:
+            if not direction:
+                raise GameError("Please specify a direction to move")
+                
+            room = self.rooms.get(self.current_room)
+            if not room:
+                raise GameError(f"Current room '{self.current_room}' not found")
+            
+            absolute_direction = self.get_absolute_direction(self.facing_direction, direction)
 
-        if absolute_direction in room.exits:
+            if absolute_direction not in room.exits:
+                raise GameError(f"Cannot move {direction} from {self.current_room}")
+                
             new_room_name = room.exits[absolute_direction]
 
+            # Handle special room cases
             if new_room_name == "communications_room" and not self.flags.get("comms_unlocked"):
                 code = input("A keypad flashes: ENTER ACCESS CODE >> ").strip().upper()
                 if code == "EMBER-IRIS-8924":
@@ -49,6 +73,7 @@ class Player:
                 else:
                     print("Access denied. The door remains sealed.")
                     return
+                    
             elif new_room_name == "exit_hatch" and not room.name == "open_area":
                 confirm = input("You are about to exit the rover. Are you sure? (yes/no) ").strip().lower()
                 if confirm != "yes":
@@ -65,6 +90,7 @@ class Player:
                     print(self.rooms[self.current_room].description)
                     self.flags["three_move_cutscene_played"] = True
                     return
+                    
             elif new_room_name == "exit_hatch" and room.name == "open_area":
                 confirm = input("You are about to enter the spaceship. Are you sure? (yes/no) ").strip().lower()
                 if confirm != "yes":
@@ -80,6 +106,7 @@ class Player:
                     self.moves.append(self.current_room)
                     print(self.rooms[self.current_room].description)
                     return
+                    
             elif new_room_name == "habitat_air_lock" and not self.flags.get("habitat_air_lock_visited"):
                 cutscene = Cutscene([
                     "You open the airlock of the habitat.",
@@ -88,6 +115,7 @@ class Player:
                 ], speed=0.04, lineDelay=2)
                 cutscene.play()
                 self.flags["habitat_air_lock_visited"] = True
+                
             elif new_room_name == "habitat_sleeping_quarters" and not self.flags.get("sleeping_quarters_visited"):
                 cutscene = Cutscene([
                     "You enter the habitat's sleeping quarters.",
@@ -96,9 +124,10 @@ class Player:
                 ], speed=0.04, lineDelay=2)
                 cutscene.play()
                 self.flags["sleeping_quarters_visited"] = True
+                
             elif new_room_name == "habitat_storage_room" and not self.flags.get("storage_room_visited"):
                 cutscene = Cutscene([
-                    "You enter the habitat's storage room.",
+                    "It's the habitat's storage room.",
                     "It's not storing anything anymore",
                     "just the dusty remains of what used to be here.",
                     "The wall no longer exists",
@@ -106,6 +135,7 @@ class Player:
                 ], speed=0.04, lineDelay=2)
                 cutscene.play()
                 self.flags["storage_room_visited"] = True
+                
             elif new_room_name == "old_rover_pad" and self.flags.get("old_rover_alive"):
                 cutscene = Cutscene([
                     "You approach the Old Rover.",
@@ -117,30 +147,47 @@ class Player:
                 Cutscene(old_rover.dialogue, speed=0.04, lineDelay=2).play()
                 old_rover.interaction()
 
+            # Update player position
             self.current_room = new_room_name
             self.facing_direction = absolute_direction
             print(self.rooms[self.current_room].description)
             self.moves.append(self.current_room)
-        else:
-            print(f"Cannot move {direction} from {self.current_room}")
+            
+        except GameError as e:
+            print(f"Movement error: {str(e)}")
+        except Exception as e:
+            print(f"Unexpected movement error: {str(e)}")
 
     def look(self):
-        room = self.rooms[self.current_room]
-        print(room.description)
-        if room.items:
-            print("You see the following items:")
-            for item in room.items:
-                print(f"- {item.name}")
-        else:
-            print("There seems to be no items in this room.")
+        try:
+            room = self.rooms.get(self.current_room)
+            if not room:
+                raise GameError("Current room not found")
+                
+            print(room.description)
+            if room.items:
+                print("You see the following items:")
+                for item in room.items:
+                    print(f"- {item.name}")
+            else:
+                print("There seems to be no items in this room.")
+                
+        except GameError as e:
+            print(f"Look error: {str(e)}")
+        except Exception as e:
+            print(f"Unexpected look error: {str(e)}")
 
     def view_inventory(self): 
-        if not self.inventory:
-            print("You currently have no items with you.")
-        else:
-            print("You are carrying:")
-            for item in self.inventory: 
-                print(f"- {item.name}")
+        try:
+            if not self.inventory:
+                print("You currently have no items with you.")
+            else:
+                print("You are carrying:")
+                for item in self.inventory: 
+                    print(f"- {item.name}")
+                    
+        except Exception as e:
+            print(f"Error viewing inventory: {str(e)}")
 
 class Item:
     def __init__(self, name, description, requires=None, interactions=None, contains=None):
@@ -151,8 +198,13 @@ class Item:
         self.contains = contains or []
 
     def inspect(self):
-        if "inspect" in self.interactions:
-            return self.interactions["inspect"]
+        try:
+            if "inspect" in self.interactions:
+                return self.interactions["inspect"]
+            return self.description
+        except Exception as e:
+            print(f"Error inspecting item: {str(e)}")
+            return self.description
 
 class Room:
     def __init__(self, name, description, exits, items):
@@ -163,19 +215,30 @@ class Room:
 
 class Cutscene:
     def __init__(self, text=[], speed=0.03, lineDelay=1):
+        if not isinstance(text, list):
+            raise GameError("Cutscene text must be a list")
         self.text = text
         self.speed = speed
         self.lineDelay = lineDelay
 
     def play(self):
-        print("\n\n")
-        for line in self.text:
+        try:
             print("\n\n")
-            for char in line:
-                print(char, end='', flush=True)
-                time.sleep(self.speed)
-            time.sleep(self.lineDelay)
-        print("\n\n")
+            for line in self.text:
+                if not isinstance(line, str):
+                    raise GameError("Cutscene line must be a string")
+                    
+                print("\n\n")
+                for char in line:
+                    print(char, end='', flush=True)
+                    time.sleep(self.speed)
+                time.sleep(self.lineDelay)
+            print("\n\n")
+            
+        except GameError as e:
+            print(f"Cutscene error: {str(e)}")
+        except Exception as e:
+            print(f"Failed to play cutscene: {str(e)}")
 
 class NPC:
     def __init__(self, name, description, dialogue, interaction):
@@ -185,40 +248,45 @@ class NPC:
         self.interaction = interaction
 
 def interact_old_rover(player):
-    lines = [
-        "The Old Rover lowers its voice module to a faint whisper.",
-        "Old Rover: You need the antenna, don't you?",
-        "Old Rover: If you take it... I will go dark.",
-        "Old Rover: But maybe... maybe it's time.",
-        "",
-        "What do you do?",
-        "1. Harvest the antenna",
-        "2. Leave Old Rover intact"
-    ]
-    Cutscene(lines).play()
+    try:
+        lines = [
+            "The Old Rover lowers its voice module to a faint whisper.",
+            "Old Rover: You need the antenna, don't you?",
+            "Old Rover: If you take it... I will go dark.",
+            "Old Rover: But maybe... maybe it's time.",
+            "",
+            "What do you do?",
+            "1. Harvest the antenna",
+            "2. Leave Old Rover intact"
+        ]
+        Cutscene(lines).play()
 
-    choice = input("> ").strip()
+        choice = input("> ").strip()
 
-    if choice == "1":
-        Cutscene([
-            "You reach out slowly, disconnecting the antenna.",
-            "Old Rover: I knew this day would come.",
-            "The lights on its sensors fade.",
-            "You now have the beacon antenna.",
-            "Try using the emergency beacon in the communications room."
-        ]).play()
-        player.flags["old_rover_alive"] = False
-        player.inventory.append(items["antenna"])
-    elif choice == "2":
-        Cutscene([
-            "You step back. The Old Rover's sensors flash briefly.",
-            "The rover gets back to it's exploration, as it has done for so long."
-        ]).play()
-        player.flags["old_rover_alive"] = True
-    else:
-        Cutscene(["Invalid choice."]).play()
-        interact_old_rover()
-
+        if choice == "1":
+            Cutscene([
+                "You reach out slowly, disconnecting the antenna.",
+                "Old Rover: I knew this day would come.",
+                "The lights on its sensors fade.",
+                "You now have the beacon antenna.",
+                "Try using the emergency beacon in the communications room."
+            ]).play()
+            player.flags["old_rover_alive"] = False
+            player.inventory.append(items["antenna"])
+        elif choice == "2":
+            Cutscene([
+                "You step back. The Old Rover's sensors flash briefly.",
+                "The rover gets back to it's exploration, as it has done for so long."
+            ]).play()
+            player.flags["old_rover_alive"] = True
+        else:
+            raise GameError("Invalid choice. Please enter 1 or 2")
+            
+    except GameError as e:
+        print(f"Interaction error: {str(e)}")
+        interact_old_rover(player)  # Retry after error
+    except Exception as e:
+        print(f"Unexpected interaction error: {str(e)}")
 
 old_rover = NPC(
     name="Old Rover",
@@ -241,9 +309,6 @@ class GameState:
         self.has_solar_parts = False
         self.has_beacon = False
 
-# use antenna on emergency beacon
-# create the ending where the emergency beacon is used to call for help, including all the ending cutscenes etc
-
 items = { 
     "sticky_note": Item("Sticky Note", "A dusty yellow sticky-note, stuck onto the side panel near Dr. Halberg's seat", interactions={'inspect': "\"don't forget the password!\nEMBER-IRIS-8924\n     — Halberg\""}),
     "mre": Item("MRE's", "A pack of MRE's (Meals Ready to Eat).", interactions={"inspect": "These will keep you fed for a while."}),
@@ -261,6 +326,7 @@ items = {
     "communications_manual": Item("Communications Manual", "A manual for the communications system.", interactions={"inspect": "Communications Manual: \n\nThis manual contains information on how to operate the communications system, including troubleshooting steps for common issues:\n\n To activate general communications, press the green 'Power' button on the console and tune frequency to 145.800 MHz, fine-tune as required.\n\n For emergency communications, use the dedicated emergency beacon.\nAttach the portable antenna to the beacon and hold the red button for 5 seconds, a blue light should activate.\nOnce the singal is received by earth, a green light will activate.\nThe beacon will display a red light if an antenna is not attached.\n\n\nThe light is red indeed, you need an antenna.\nThe antenna that's laying around here is broken. Where can you possibly find a working antenna?\nMaybe the old rovers that are active from the previous mission may have some.\nThe old mission was North of our spaceship."}),
     "antenna": Item("Antenna", "A working antenna, used to activate the emergency beacon.", interactions={"inspect": "This antenna is in good condition and can be used to activate the emergency beacon."}),
 }
+
 rooms = {
     "center": Room("center", "You are in the center of the ship.", {"west": "communications_room", "east": "storage_room", "north": "control_room", "south": "engine_room"}, []),
     "communications_room": Room("communications_room", "You are in the communications room.", {"east": "center", "south": "exit_hatch"}, [items["headphones"], items["broken_antenna"], items["radio"], items["emergency_beacon"], items["communications_manual"]]),
@@ -280,6 +346,19 @@ rooms = {
     "old_rover_pad": Room("old_rover_pad", "You are in the old rover pad.", {"west": "north_debris"}, []),
 }
 
+def validate_game_world():
+    """Check that all room exits point to valid rooms"""
+    try:
+        room_names = set(rooms.keys())
+        for room_name, room in rooms.items():
+            for direction, target_room in room.exits.items():
+                if target_room not in room_names:
+                    raise GameError(f"Room '{room_name}' has invalid exit: '{target_room}' doesn't exist")
+        return True
+    except GameError as e:
+        print(f"Game world error: {str(e)}")
+        return False
+
 class Game:
     def __init__(self, player, rooms):
         self.player = player
@@ -298,157 +377,212 @@ class Game:
         }
 
     def start(self):
-        print(self.rooms[self.player.current_room].description)
-        while self.running:
-            command_input = input("\n> ").strip().lower()
-            self.handle_command(command_input)
-            if len(self.player.moves) == 3 and not self.player.flags.get("three_move_cutscene_played"):
-                Cutscene([
-                    "The dust storm sure hit hard...",
-                    "You should probably check if something is damaged outside,",
-                    "try exiting through the airlock."
-                ], speed=0.03, lineDelay=2).play()
-                self.player.flags["three_move_cutscene_played"] = True
-            
+        try:
+            print(self.rooms[self.player.current_room].description)
+            while self.running:
+                command_input = input("\n> ").strip().lower()
+                self.handle_command(command_input)
+                if len(self.player.moves) == 3 and not self.player.flags.get("three_move_cutscene_played"):
+                    Cutscene([
+                        "The dust storm sure hit hard...",
+                        "You should probably check if something is damaged outside,",
+                        "try exiting through the airlock."
+                    ], speed=0.03, lineDelay=2).play()
+                    self.player.flags["three_move_cutscene_played"] = True
+                    
+        except Exception as e:
+            print(f"Critical game error: {str(e)}")
+            print("Game session terminated unexpectedly.")
 
     def handle_command(self, command_input):
         if not command_input:
             return
 
-        parts = command_input.split()
-        command = parts[0]
-        args = parts[1:]
+        try:
+            parts = command_input.split()
+            command = parts[0]
+            args = parts[1:]
 
-        if command in self.commands:
-            self.commands[command](args)
-        else:
-            print("Unknown command. Type 'help' for a list of commands.")
+            if command in self.commands:
+                self.commands[command](args)
+            else:
+                raise GameError("Unknown command. Type 'help' for a list of commands.")
+                
+        except GameError as e:
+            print(f"Error: {str(e)}")
+        except Exception as e:
+            print(f"Unexpected command error: {str(e)}")
 
     def command_move(self, args):
-        if not args:
-            print("Move where?")
-            return
-        self.player.move(args[0])
+        try:
+            if not args:
+                raise GameError("Move where?")
+            self.player.move(args[0])
+        except GameError as e:
+            print(f"Move error: {str(e)}")
+        except Exception as e:
+            print(f"Unexpected move error: {str(e)}")
 
     def command_look(self, args):
-        self.player.look()
+        try:
+            self.player.look()
+        except Exception as e:
+            print(f"Look command failed: {str(e)}")
 
     def command_inventory(self, args):
-        self.player.view_inventory()
+        try:
+            self.player.view_inventory()
+        except Exception as e:
+            print(f"Inventory command failed: {str(e)}")
 
     def command_take(self, args):
-        if not args:
-            print("Take what?")
-            return
-        item_name = " ".join(args)
-        room = self.rooms[self.player.current_room]
-        for item in room.items:
-            if item.name.lower() == item_name:
-                self.player.inventory.append(item)
-                room.items.remove(item)
-                print(f"You picked up the {item.name}.")
-                return
-        print(f"No item named '{item_name}' found here.")
-#saatviks code
+        try:
+            if not args:
+                raise GameError("Take what?")
+                
+            item_name = " ".join(args)
+            room = self.rooms.get(self.player.current_room)
+            if not room:
+                raise GameError("Current room not found")
+            
+            item = next((i for i in room.items if i.name.lower() == item_name.lower()), None)
+            if not item:
+                raise GameError(f"No item named '{item_name}' found here")
+                
+            self.player.inventory.append(item)
+            room.items.remove(item)
+            print(f"You picked up the {item.name}.")
+            
+        except GameError as e:
+            print(f"Take error: {str(e)}")
+        except Exception as e:
+            print(f"Unexpected take error: {str(e)}")
+
     def command_use(self, args):
-        if not args:
-            print("Use what on what?")
-            return
-        if "on" in args:
+        try:
+            if not args:
+                raise GameError("Use what on what?")
+                
+            if "on" not in args:
+                raise GameError("Syntax: use <item> on <target>")
+                
             on_idx = args.index("on")
             item_name = " ".join(args[:on_idx])
             target_name = " ".join(args[on_idx+1:])
-        else:
-            print("Syntax: use <item> on <target>")
-            return
 
-        tool = next((i for i in self.player.inventory if i.name.lower() == item_name), None)
-        if not tool:
-            print(f"You don't have an item named '{item_name}'.")
-            return
+            tool = next((i for i in self.player.inventory if i.name.lower() == item_name.lower()), None)
+            if not tool:
+                raise GameError(f"You don't have an item named '{item_name}'")
 
-        room = self.rooms[self.player.current_room]
-        target = next((i for i in room.items if i.name.lower() == target_name), None)
-        in_inventory = False
-        if not target:
-            target = next((i for i in self.player.inventory if i.name.lower() == target_name), None)
-            in_inventory = bool(target)
+            room = self.rooms[self.player.current_room]
+            target = next((i for i in room.items if i.name.lower() == target_name.lower()), None)
+            in_inventory = False
+            if not target:
+                target = next((i for i in self.player.inventory if i.name.lower() == target_name.lower()), None)
+                in_inventory = bool(target)
 
-        if not target:
-            print(f"There is no '{target_name}' here or in your inventory.")
-            return
+            if not target:
+                raise GameError(f"There is no '{target_name}' here or in your inventory")
 
-        
-        if tool.name == "Antenna" and target.name == "Emergency Beacon":
-            Cutscene([
-                "You attach the antenna onto the emergency beacon.",
-                "The red error light turns blue and then... it turns green.",
-                "A faint buzzing sound confirms the signal is broadcasting.",
-                "Now it's just a matter of waiting...",
-                "",
-                "Hours pass.",
-                "Then... a sound. A voice crackles through the comms.",
-                "\"We received your signal. Help is on the way.\"",
-                "You're going home."
-            ], speed=0.04, lineDelay=2).play()
-            print("=== GAME END ===")
-            self.running = False
-            return
+            # Emergency Beacon win condition
+            if tool.name == "Antenna" and target.name == "Emergency Beacon":
+                Cutscene([
+                    "You attach the antenna onto the emergency beacon.",
+                    "The red error light turns blue and then... it turns green.",
+                    "A faint buzzing sound confirms the signal is broadcasting.",
+                    "Now it's just a matter of waiting...",
+                    "",
+                    "Hours pass.",
+                    "Then... a sound. A voice crackles through the comms.",
+                    "\"We received your signal. Help is on the way.\"",
+                    "You're going home."
+                ], speed=0.04, lineDelay=2).play()
+                print("=== GAME END ===")
+                self.running = False
+                return
 
-        if target.requires and tool.name in target.requires:
-            print(f"You used {tool.name} on {target.name}.")
-            print(f"{target.name} opens, revealing:")
-            for content_name in target.contains:
-                content = items[content_name]
+            # Handle item requirements
+            if target.requires and tool.name in target.requires:
+                print(f"You used {tool.name} on {target.name}.")
+                print(f"{target.name} opens, revealing:")
+                for content_name in target.contains:
+                    content = items.get(content_name)
+                    if not content:
+                        continue
+                    if in_inventory:
+                        self.player.inventory.append(content)
+                        print(f"- {content.name} (added to inventory)")
+                    else:
+                        room.items.append(content)
+                        print(f"- {content.name} (dropped in the room)")
                 if in_inventory:
-                    self.player.inventory.append(content)
-                    print(f"- {content.name} (added to inventory)")
+                    self.player.inventory.remove(target)
                 else:
-                    room.items.append(content)
-                    print(f"- {content.name} (dropped in the room)")
-            if in_inventory:
-                self.player.inventory.remove(target)
-            else:
-                room.items.remove(target)
-            return
+                    room.items.remove(target)
+                return
 
-        print(f"Using {tool.name} on {target.name} did nothing.")
+            print(f"Using {tool.name} on {target.name} did nothing.")
+            
+        except GameError as e:
+            print(f"Use error: {str(e)}")
+        except Exception as e:
+            print(f"Unexpected use error: {str(e)}")
 
-#end saatviks code
     def command_help(self, args):
-        print("Available commands:")
-        for cmd in self.commands:
-            print(f"- {cmd}")
+        try:
+            print("Available commands:")
+            for cmd in self.commands:
+                print(f"- {cmd}")
+        except Exception as e:
+            print(f"Help command failed: {str(e)}")
 
     def command_exit(self, args):
-        print("Exiting game.")
-        self.running = False
-#saatviks code 
+        try:
+            print("Exiting game.")
+            self.running = False
+        except Exception as e:
+            print(f"Exit command failed: {str(e)}")
+
     def command_inspect(self, args):       
-        if not args:            
-            print("Inspect what?")
-            return
-        item_name = " ".join(args)
-        item = next((i for i in self.player.inventory if i.name.lower() == item_name), None)
-        if not item:
-            room = self.rooms[self.player.current_room]
-            item = next((i for i in room.items if i.name.lower() == item_name), None)
-        if not item:
-            print(f"There is no '{item_name}' here or in your inventory.")
-            return
-        print(item.inspect())
-#end saatviks code 
+        try:
+            if not args:            
+                raise GameError("Inspect what?")
+                
+            item_name = " ".join(args)
+            item = next((i for i in self.player.inventory if i.name.lower() == item_name.lower()), None)
+            if not item:
+                room = self.rooms[self.player.current_room]
+                if not room:
+                    raise GameError("Current room not found")
+                item = next((i for i in room.items if i.name.lower() == item_name.lower()), None)
+            if not item:
+                raise GameError(f"There is no '{item_name}' here or in your inventory")
+                
+            print(item.inspect())
+            
+        except GameError as e:
+            print(f"Inspect error: {str(e)}")
+        except Exception as e:
+            print(f"Unexpected inspect error: {str(e)}")
 
 if __name__ == "__main__":
-    player = Player("Player1", rooms)
-    intro = Cutscene([
-    "Sol 37. The storm hit harder than anything predicted.",
-    "The habitat collapsed. You're the only one who made it to the rover in time.",
-    "Power is out. Oxygen is dropping. You have to get back inside..."
-    ], speed=0.04, lineDelay=2)
-    intro.play()
+    try:
+        # Validate game world before starting
+        if not validate_game_world():
+            print("Critical errors in game world setup. Exiting.")
+            exit(1)
+            
+        player = Player("Player1", rooms)
+        intro = Cutscene([
+        "Sol 37. The storm hit harder than anything predicted.",
+        "The habitat collapsed. You're the only one who made it to the rover in time.",
+        "Power is out. Oxygen is dropping. You have to get back inside..."
+        ], speed=0.04, lineDelay=2)
+        intro.play()
 
-    game = Game(player, rooms)
-    game.start()
-
-## End Dhyan's Code 
+        game = Game(player, rooms)
+        game.start()
+        
+    except Exception as e:
+        print(f"Fatal error: {str(e)}")
+        print("Game cannot start.")
