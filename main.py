@@ -1,4 +1,5 @@
 import time
+import os #Add personalised ending message with user's name
 
 class Player:
     def __init__(self, name, rooms):
@@ -208,7 +209,6 @@ def interact_old_rover(player):
         ]).play()
         player.flags["old_rover_alive"] = False
         player.inventory.append(items["antenna"])
-        player.inventory.append(items["emergency_beacon"])
     elif choice == "2":
         Cutscene([
             "You step back. The Old Rover's sensors flash briefly.",
@@ -241,7 +241,10 @@ class GameState:
         self.has_solar_parts = False
         self.has_beacon = False
 
-items = {
+# use antenna on emergency beacon
+# create the ending where the emergency beacon is used to call for help, including all the ending cutscenes etc
+
+items = { 
     "sticky_note": Item("Sticky Note", "A dusty yellow sticky-note, stuck onto the side panel near Dr. Halberg's seat", interactions={'inspect': "\"don't forget the password!\nEMBER-IRIS-8924\n     — Halberg\""}),
     "mre": Item("MRE's", "A pack of MRE's (Meals Ready to Eat).", interactions={"inspect": "These will keep you fed for a while."}),
     "old_air_filter": Item("Old Air Filter", "An old air filter, covered in dust.", interactions={"inspect": "It looks like it hasn't been used in a long time."}),
@@ -373,6 +376,23 @@ class Game:
 
         if not target:
             print(f"There is no '{target_name}' here or in your inventory.")
+            return
+
+        
+        if tool.name == "Antenna" and target.name == "Emergency Beacon":
+            Cutscene([
+                "You attach the antenna onto the emergency beacon.",
+                "The red error light turns blue and then... it turns green.",
+                "A faint buzzing sound confirms the signal is broadcasting.",
+                "Now it's just a matter of waiting...",
+                "",
+                "Hours pass.",
+                "Then... a sound. A voice crackles through the comms.",
+                "\"We received your signal. Help is on the way.\"",
+                "You're going home."
+            ], speed=0.04, lineDelay=2).play()
+            print("=== GAME END ===")
+            self.running = False
             return
 
         if target.requires and tool.name in target.requires:
