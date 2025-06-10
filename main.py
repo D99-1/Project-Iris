@@ -1,4 +1,5 @@
 import time
+import random
 
 class GameError(Exception):
     # custom exception for errors
@@ -16,6 +17,7 @@ class Player:
             "comms_unlocked": False,
             "old_rover_alive": True,
             "has_working_antenna": False,
+            "three_move_cutscene_played": False,
         }
 
     def get_absolute_direction(self, facing, relative_direction):
@@ -223,17 +225,17 @@ class Cutscene:
 
     def play(self):
         try:
-            print("\n\n")
+            print("\n")
             for line in self.text:
                 if not isinstance(line, str):
                     raise GameError("Cutscene line must be a string")
                     
-                print("\n\n")
+                print("")
                 for char in line:
                     print(char, end='', flush=True)
                     time.sleep(self.speed)
                 time.sleep(self.lineDelay)
-            print("\n\n")
+            print("\n")
             
         except GameError as e:
             print(f"Cutscene error: {str(e)}")
@@ -259,7 +261,7 @@ def interact_old_rover(player):
             "1. Harvest the antenna",
             "2. Leave Old Rover intact"
         ]
-        Cutscene(lines).play()
+        Cutscene(lines, speed=0.04, lineDelay=1.5).play()
 
         choice = input("> ").strip()
 
@@ -270,14 +272,14 @@ def interact_old_rover(player):
                 "The lights on its sensors fade.",
                 "You now have the beacon antenna.",
                 "Try using the emergency beacon in the communications room."
-            ]).play()
+            ], speed=0.04, lineDelay=1.5).play()
             player.flags["old_rover_alive"] = False
             player.inventory.append(items["antenna"])
         elif choice == "2":
             Cutscene([
                 "You step back. The Old Rover's sensors flash briefly.",
-                "The rover gets back to it's exploration, as it has done for so long."
-            ]).play()
+                "The rover gets back to its exploration, as it has done for so long."
+            ], speed=0.04, lineDelay=1.5).play()
             player.flags["old_rover_alive"] = True
         else:
             raise GameError("Invalid choice. Please enter 1 or 2")
@@ -310,15 +312,16 @@ class GameState:
         self.has_beacon = False
 
 items = { 
-    "sticky_note": Item("Sticky Note", "A dusty yellow sticky-note, stuck onto the side panel near Dr. Halberg's seat", interactions={'inspect': "\"don't forget the password!\nEMBER-IRIS-8924\n     — Halberg\""}),
+    "sticky_note": Item("Sticky Note", "A dusty yellow sticky-note, stuck onto the side panel near Dr. Halberg's seat", interactions={'inspect': "\"don't forget the password!\nEMBER-IRIS-8924\n      — Halberg\""}),
     "mre": Item("MRE's", "A pack of MRE's (Meals Ready to Eat).", interactions={"inspect": "These will keep you fed for a while."}),
     "old_air_filter": Item("Old Air Filter", "An old air filter, covered in dust.", interactions={"inspect": "It looks like it hasn't been used in a long time."}),
     "empty_containers": Item("Empty Containers", "A few empty containers, likely used for storage.", interactions={"inspect": "They are empty and useless now."}),
     "north_metal_scraps": Item("Metal Scraps", "A pile of metal scraps", interactions={"inspect": "These could be useful for repairs."}),
-    "sealed_briefcase": Item("Sealed Briefcase", "Sealed Black Briefcase with an embossed US government seal",interactions={"inspect": "It seems to be locked with a rusty padlock. No key in sight."},requires=["Rusty Spanner"],contains=["iris"]),
+    "sealed_briefcase": Item("Sealed Briefcase", "Sealed Black Briefcase with an embossed US government seal", interactions={"inspect": "It seems to be locked with a rusty padlock. You'll need something with leverage to break it open."}, requires=["Rusty Spanner"], contains=["iris"]),
     "rusty_spanner": Item("Rusty Spanner", "A rusty spanner.", interactions={"inspect": "It might still be useful for some repairs."}),
     "torn_clothing": Item("Torn Clothing", "A pile of ripped clothes", interactions={"inspect": "This doesn't look like it's useful anymore."}),
-    "iris": Item("Iris", "A small large black box with a small screen and a few buttons. It seems to be some kind of device.", interactions={"inspect":"There is a handbook attached to the device. It reads:\n\nIRIS: STRICTLY CONFIDENTIAL\n\nFOR AUTHORISED PERSONNEL ONLY\n\nDO NOT ATTEMPT TO ACCESS WITHOUT PROPER AUTHORISATION\n\n-------------------------\n\nIRIS is a self-regulating, life support system designed to preserve designated subjects indefinitely in the event of catastrophic failure in hostile environments.\n\nOnce activated, IRIS *will* take care of you, however IRIS remains a prototype at this stage\n\nThere are known tendencies for IRIS to emit unintended UHF signals, known to cause interterrestrial interference and potentially attract extraterrestrial attention.\n\nAT THIS POINT IN TIME, IRIS IS NOT TO BE ACTIVATED, RISK OF FAILURE REMAINS TOO HIGH."}),
+    "iris": Item("Iris", "A small black box with a small screen and a few buttons. A slot on its side is empty, marked 'PRIMARY POWER'.", interactions={"inspect":"The handbook is still attached. It reads:\n\nIRIS: STRICTLY CONFIDENTIAL\n\nFOR AUTHORISED PERSONNEL ONLY\n\nDO NOT ATTEMPT TO ACCESS WITHOUT PROPER AUTHORISATION\n\n-------------------------\n\nIRIS is a self-regulating, life support system designed to preserve designated subjects indefinitely in the event of catastrophic failure in hostile environments.\n\nOnce activated, IRIS *will* take care of you, however IRIS remains a prototype at this stage\n\nThere are known tendencies for IRIS to emit unintended UHF signals, known to cause interterrestrial interference and potentially attract extraterrestrial attention.\n\nAT THIS POINT IN TIME, IRIS IS NOT TO BE ACTIVATED, RISK OF FAILURE REMAINS TOO HIGH.\n\nA small, handwritten note is taped below the empty power slot: 'Requires a standard 250-volt portable power cell to initiate.'"}),
+    "unstable_power_cell": Item("Unstable Power Cell", "A portable 250-volt power cell. It feels warm to the touch and hums faintly.", interactions={"inspect": "The casing is cracked, and a warning label reads: 'CAUTION: Unstable. Risk of UHF signal leakage.' This must be the power source for IRIS."}),
     "headphones": Item("Headphones", "A good old pair of wired headphones.", interactions={"inspect": "These were probably used to communicate with earth."}),
     "radio": Item("Radio", "A small radio device, likely used for communication.", interactions={"inspect": "It seems to be broken, doesn't look like it's in a repairable condition."}),
     "emergency_beacon": Item("Emergency Beacon", "A small emergency beacon, used to signal for help.", interactions={"inspect": "This could be useful to call back to Earth for help. You need a working antenna to activate this."}),
@@ -332,7 +335,7 @@ rooms = {
     "communications_room": Room("communications_room", "You are in the communications room.", {"east": "center", "south": "exit_hatch"}, [items["headphones"], items["broken_antenna"], items["radio"], items["emergency_beacon"], items["communications_manual"]]),
     "storage_room": Room("storage_room", "You are in the storage room.", {"west": "center", "south": "rover_launch_bay"}, []), 
     "control_room": Room("control_room", "You are in the control room.", {"south": "center"}, [items["sticky_note"]]),
-    "engine_room": Room("engine_room", "You are in the engine room.", {"north": "center", "west": "exit_hatch", "east": "rover_launch_bay"}, []),
+    "engine_room": Room("engine_room", "You are in the engine room. The low hum of dormant machinery fills the air. Tucked away behind a coolant pipe, you see something.", {"north": "center", "west": "exit_hatch", "east": "rover_launch_bay"}, [items["unstable_power_cell"]]),
     "rover_launch_bay": Room("rover_launch_bay", "You are in the rover launch bay.", {"north": "storage_room", "west": "engine_room"}, []),
     "exit_hatch": Room("exit_hatch", "You are at the exit hatch.", {"north": "communications_room", "east": "engine_room"}, []),
     "open_area": Room("open_area", "You roam free on the lands of Mars.", {"north": "north_debris", "west": "habitat_air_lock", "south": "south_debris", "east": "exit_hatch"}, []),
@@ -381,6 +384,7 @@ class Game:
             print(self.rooms[self.player.current_room].description)
             while self.running:
                 command_input = input("\n> ").strip().lower()
+                if not self.running: break # Check if game has ended mid-command
                 self.handle_command(command_input)
                 if len(self.player.moves) == 3 and not self.player.flags.get("three_move_cutscene_played"):
                     Cutscene([
@@ -474,6 +478,14 @@ class Game:
             if not tool:
                 raise GameError(f"You don't have an item named '{item_name}'")
 
+            if tool.name == "Unstable Power Cell" and target_name.lower() == "iris":
+                target_in_inventory = next((i for i in self.player.inventory if i.name.lower() == "iris"), None)
+                if target_in_inventory:
+                    self.trigger_iris_ending()
+                    return
+                else:
+                    raise GameError("You need to have the IRIS device in your inventory to use the power cell on it.")
+
             room = self.rooms[self.player.current_room]
             target = next((i for i in room.items if i.name.lower() == target_name.lower()), None)
             in_inventory = False
@@ -528,6 +540,91 @@ class Game:
         except Exception as e:
             print(f"Unexpected use error: {str(e)}")
 
+    def trigger_iris_ending(self):
+        
+        Cutscene([
+            "You slot the humming power cell into the IRIS device.",
+            "The screen flickers to life, bathing you in a cold, blue light.",
+            "IRIS: 'Primary power detected. Life support protocol IRIS now active.'",
+            "IRIS: 'Calibration required. Please respond to prompts to stabilize system core.'",
+            "IRIS: 'Failure to comply may result in... unintended consequences.'"
+        ], speed=0.04, lineDelay=2).play()
+
+        calibration_success = True
+        prompts = {
+            "First, reroute auxiliary power. Do you route to [1] shields or [2] life-support?": "2",
+            "Next, align the gravimetric field. Set frequency to [1] 77.3 GHz or [2] 99.1 GHz?": "1",
+            "Finally, purge the coolant system. Do you [1] vent externally or [2] recycle coolant?": "1"
+        }
+
+        for prompt, correct_answer in prompts.items():
+            print(f"IRIS: '{prompt}'")
+            choice = input("> ").strip()
+            if choice != correct_answer:
+                calibration_success = False
+                Cutscene(["IRIS: 'Calibration failed. System integrity compromised.'"]).play()
+                break
+            else:
+                Cutscene(["IRIS: '...Acknowledged.'"], speed=0.01, lineDelay=0.5).play()
+        
+        if calibration_success:
+            Cutscene(["IRIS: 'Calibration successful. System is stable.'"]).play()
+
+        Cutscene([
+            "The device hums louder, its light intensifying.",
+            "IRIS: 'Final activation sequence initiated.'",
+            "IRIS: 'Warning: Prototype stabilization field may have unpredictable results.'",
+            "A countdown appears on the screen: 5... 4... 3..."
+        ], speed=0.04, lineDelay=1.5).play()
+
+        print("\nWhat do you do?")
+        print("1. Trust the device. Let IRIS activate.")
+        
+        has_spanner = any(item.name == "Rusty Spanner" for item in self.player.inventory)
+        if has_spanner:
+            print("2. This is a mistake! Smash the device with the spanner!")
+
+        choice = input("> ").strip()
+
+        if choice == '2' and has_spanner:
+            Cutscene([
+                "You grip the rusty spanner and swing with all your might!",
+                "Sparks erupt as metal screams against plastic.",
+                "IRIS: 'ERROR! ERROR! SUBJECT NON-COMPLIANT! CATASTROPHIC-'",
+                "The light from the device dies with a final, pathetic flicker.",
+                "Silence returns to the rover. You are alone again, the silence deeper than before.",
+                "You chose your own fate, for better or worse.",
+                "\n=== ENDING: A DEFIANT FATE ==="
+            ], speed=0.04, lineDelay=2).play()
+
+        else: 
+            if choice != '1':
+                print("\nYou hesitate for too long. The choice is made for you.")
+            
+            extraterrestrial_chance = 0.80 if not calibration_success else 0.55
+
+            if random.random() < extraterrestrial_chance:
+                Cutscene([
+                    "IRIS: 'Activation complete. Emitting preservation field...'",
+                    "The blue light pulses... but the device emits a high-pitched whine.",
+                    "IRIS: 'WARNING! UNKNOWN UHF INTERFERENCE DETECTED! SOURCE... APPROACHING!'",
+                    "The rover's hull groans, not from the wind, but from a shadow falling over it.",
+                    "You look out the viewport to see something vast and dark descending from the Martian sky.",
+                    "IRIS attracted the wrong kind of attention.",
+                    "\n=== ENDING: UNEXPECTED RESCUE ==="
+                ], speed=0.04, lineDelay=2).play()
+            else:
+                Cutscene([
+                    "IRIS: 'Activation complete. Biostabilization commencing.'",
+                    "A wave of cold energy washes over you. Your muscles lock, your breathing stops, but you feel no panic.",
+                    "Your vision is filled with a serene, endless blue light.",
+                    "You are safe. Preserved. Waiting for a rescue that may never come.",
+                    "You are immortal on the red planet. Forever.",
+                    "\n=== ENDING: THE LONELY IMMORTAL ==="
+                ], speed=0.04, lineDelay=2).play()
+
+        self.running = False # End the game
+
     def command_help(self, args):
         try:
             print("Available commands:")
@@ -543,9 +640,9 @@ class Game:
         except Exception as e:
             print(f"Exit command failed: {str(e)}")
 
-    def command_inspect(self, args):       
+    def command_inspect(self, args):      
         try:
-            if not args:            
+            if not args:          
                 raise GameError("Inspect what?")
                 
             item_name = " ".join(args)
