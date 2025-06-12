@@ -35,9 +35,17 @@ class Player:
                     relative_direction = key
                     break
             else:
-                raise GameError(f"Invalid direction: {relative_direction}")
+                # Allow absolute directions to pass through
+                if relative_direction in ["north", "south", "east", "west"]:
+                    pass
+                else:
+                    raise GameError(f"Invalid direction: {relative_direction}")
             
             directions = ["north", "east", "south", "west"]
+            # If it's already an absolute direction, just return it
+            if relative_direction in directions:
+                return relative_direction
+                
             offsets = {"front": 0, "right": 1, "back": 2, "left": -1}
             
             if facing not in directions:
@@ -62,7 +70,7 @@ class Player:
             absolute_direction = self.get_absolute_direction(self.facing_direction, direction)
 
             if absolute_direction not in room.exits:
-                raise GameError(f"Cannot move {direction} from {self.current_room}")
+                raise GameError(f"Cannot move {absolute_direction} from {self.current_room}")
                 
             new_room_name = room.exits[absolute_direction]
 
@@ -328,25 +336,63 @@ items = {
     "broken_antenna": Item("Broken Antenna", "A broken antenna, likely used for communication.", interactions={"inspect": "It seems to be damaged beyond repair. This would've been used to activate the emergency beacon."}),
     "communications_manual": Item("Communications Manual", "A manual for the communications system.", interactions={"inspect": "Communications Manual: \n\nThis manual contains information on how to operate the communications system, including troubleshooting steps for common issues:\n\n To activate general communications, press the green 'Power' button on the console and tune frequency to 145.800 MHz, fine-tune as required.\n\n For emergency communications, use the dedicated emergency beacon.\nAttach the portable antenna to the beacon and hold the red button for 5 seconds, a blue light should activate.\nOnce the singal is received by earth, a green light will activate.\nThe beacon will display a red light if an antenna is not attached.\n\n\nThe light is red indeed, you need an antenna.\nThe antenna that's laying around here is broken. Where can you possibly find a working antenna?\nMaybe the old rovers that are active from the previous mission may have some.\nThe old mission was North of our spaceship."}),
     "antenna": Item("Antenna", "A working antenna, used to activate the emergency beacon.", interactions={"inspect": "This antenna is in good condition and can be used to activate the emergency beacon."}),
+    "flickering_datapad": Item("Flickering Datapad", "A datapad with a cracked screen. It's lying on the floor.", 
+        interactions={"inspect": "The battery is almost dead. The screen shows a single, corrupted log entry: 'Sol 36: ...strange readings from the northern ridge. It's not geological. Re-calibrating the deep-scan array...' The screen dies."}),
+    "oily_rag": Item("Oily Rag", "A greasy rag left on a console.", 
+        interactions={"inspect": "It smells strongly of hydraulic fluid. It's covered in grime."}),
+    "nutrient_paste_crate": Item("Nutrient Paste Crate", "A large crate of emergency rations.", 
+        interactions={"inspect": "A manifest is taped to the side: 'CONTENTS: 150x Nutrient Paste Tubes. FLAVOR: Gray.' The crate is sealed shut."}),
+    "small_wrench": Item("Small Wrench", "A small, adjustable wrench lying on the floor.", 
+        interactions={"inspect": "It's a standard-issue 10mm wrench. It seems too small to be useful for any of the heavy machinery here."}),
+    "warning_placard": Item("Warning Placard", "A faded warning placard bolted to the wall.", 
+        interactions={"inspect": "The placard reads: 'CAUTION: Airlock door must remain sealed during dust storms. In case of emergency, communications manual is located in the comms room.'"}),
+    "strange_rock": Item("Strange Rock", "A peculiar-looking rock, different from the surrounding regolith.", 
+        interactions={"inspect": "The rock has an unusual, almost metallic sheen. It's probably just a high concentration of iron ore."}),
+    "scorched_panel": Item("Scorched Panel", "A scorched panel from the habitat's outer wall.", 
+        interactions={"inspect": "This panel looks like it was hit by a massive power surge. The circuits are completely fried."}),
+    "withered_plant": Item("Withered Plant", "The desiccated remains of a small plant in a pot.", 
+        interactions={"inspect": "This was once someone's attempt to grow something green on Mars. It has long since died."}),
+    "halbergs_datapad": Item("Halberg's Datapad", "A personal datapad lying half-buried under a torn blanket.", 
+        interactions={"inspect": "It's Dr. Halberg's datapad. The final entry is open:\n\n'Sol 37. The storm is too much. I had to lock down the comms room, but I'm always forgetting that blasted code. I stuck a note somewhere obvious near my seat in the control room. If IRIS is our only hope, I pray the briefcase is still in the north debris field where I left it. The old spanner should be there too. Someone has to make it.'"}),
+    "soil_kit": Item("Soil Analysis Kit", "A soil analysis kit, dropped on the floor.", 
+        interactions={"inspect": "The last analysis reads: 'Sample 42. High iron-oxide content. Trace organic compounds... anomalous reading detected. Recommend further investigation.'"}),
+    "old_rover_tracks": Item("Old Rover Tracks", "Deep tracks in the dust.", 
+        interactions={"inspect": "These tracks lead away from the pad and into the vast Martian landscape. The Old Rover has been busy."}),
 }
 
 rooms = {
-    "center": Room("center", "You are in the center of the ship.", {"west": "communications_room", "east": "storage_room", "north": "control_room", "south": "engine_room"}, []),
-    "communications_room": Room("communications_room", "You are in the communications room.", {"east": "center", "south": "exit_hatch"}, [items["headphones"], items["broken_antenna"], items["radio"], items["emergency_beacon"], items["communications_manual"]]),
-    "storage_room": Room("storage_room", "You are in the storage room.", {"west": "center", "south": "rover_launch_bay"}, []), 
-    "control_room": Room("control_room", "You are in the control room.", {"south": "center"}, [items["sticky_note"]]),
-    "engine_room": Room("engine_room", "You are in the engine room. The low hum of dormant machinery fills the air. Tucked away behind a coolant pipe, you see something.", {"north": "center", "west": "exit_hatch", "east": "rover_launch_bay"}, [items["unstable_power_cell"]]),
-    "rover_launch_bay": Room("rover_launch_bay", "You are in the rover launch bay.", {"north": "storage_room", "west": "engine_room"}, []),
-    "exit_hatch": Room("exit_hatch", "You are at the exit hatch.", {"north": "communications_room", "east": "engine_room"}, []),
-    "open_area": Room("open_area", "You roam free on the lands of Mars.", {"north": "north_debris", "west": "habitat_air_lock", "south": "south_debris", "east": "exit_hatch"}, []),
-    "south_debris": Room("south_debris", "You are in the south debris area.", {"north": "open_area", "west": "habitat_sleeping_quarters"}, []),
-    "north_debris": Room("north_debris", "You are in the north debris area.", {"south": "open_area", "west": "habitat_storage_room", "east": "old_rover_pad"}, [items["mre"], items["old_air_filter"], items["north_metal_scraps"], items["empty_containers"], items["sealed_briefcase"], items["torn_clothing"], items["rusty_spanner"]]),
-    "habitat_air_lock": Room("habitat_air_lock", "You are in the habitat air lock.", {"north": "habitat_irrigation_area", "south": "habitat_sleeping_quarters"}, []),
-    "habitat_irrigation_area": Room("habitat_irrigation_area", "You are in the habitat irrigation area.", {"north": "habitat_storage_room", "south": "habitat_air_lock"}, []),
-    "habitat_sleeping_quarters": Room("habitat_sleeping_quarters", "You are in the habitat sleeping quarters.", {"north": "habitat_air_lock", "east": "south_debris"}, []),
-    "habitat_storage_room": Room("habitat_storage_room", "You are in the habitat storage room.", {"south": "habitat_irrigation_area", "east": "north_debris"}, []),
-    "rover_pad": Room("rover_pad", "You are in the rover pad.", {"north": "rover_launch_bay"}, []),
-    "old_rover_pad": Room("old_rover_pad", "You are in the old rover pad.", {"west": "north_debris"}, []),
+    "center": Room("center", "You are in the center of the ship, a nexus connecting the main sections.", {"west": "communications_room", "east": "storage_room", "north": "control_room", "south": "engine_room"}, 
+        [items["flickering_datapad"]]),
+    "communications_room": Room("communications_room", "You are in the communications room. Consoles are dark and silent.", {"east": "center", "south": "exit_hatch"}, 
+        [items["headphones"], items["broken_antenna"], items["radio"], items["emergency_beacon"], items["communications_manual"]]),
+    "storage_room": Room("storage_room", "You are in the storage room. Shelves are mostly empty.", {"west": "center", "south": "rover_launch_bay"}, 
+        [items["nutrient_paste_crate"], items["empty_containers"]]), 
+    "control_room": Room("control_room", "You are in the control room. The main viewscreen is cracked.", {"south": "center"}, 
+        [items["sticky_note"]]),
+    "engine_room": Room("engine_room", "You are in the engine room. The low hum of dormant machinery fills the air. Tucked away behind a coolant pipe, you see something.", {"north": "center", "west": "exit_hatch", "east": "rover_launch_bay"}, 
+        [items["unstable_power_cell"], items["oily_rag"]]),
+    "rover_launch_bay": Room("rover_launch_bay", "You are in the rover launch bay. A fine layer of red dust covers everything.", {"north": "storage_room", "west": "engine_room"}, 
+        []),
+    "exit_hatch": Room("exit_hatch", "You are at the exit hatch. The outer door is sealed tight.", {"north": "communications_room", "east": "engine_room"}, 
+        [items["warning_placard"]]),
+    "open_area": Room("open_area", "You roam free on the lands of Mars. The red desert stretches to the horizon.", {"north": "north_debris", "west": "habitat_air_lock", "south": "south_debris", "east": "exit_hatch"}, 
+        [items["strange_rock"]]),
+    "south_debris": Room("south_debris", "You are in the south debris area, amidst twisted metal from the habitat.", {"north": "open_area", "west": "habitat_sleeping_quarters"}, 
+        [items["scorched_panel"], items["torn_clothing"]]),
+    "north_debris": Room("north_debris", "You are in the north debris area. This seems to be where supplies were offloaded.", {"south": "open_area", "west": "habitat_storage_room", "east": "old_rover_pad"}, 
+        [items["mre"], items["old_air_filter"], items["north_metal_scraps"], items["sealed_briefcase"], items["rusty_spanner"]]),
+    "habitat_air_lock": Room("habitat_air_lock", "You are in the habitat air lock. The inner door hangs ajar.", {"north": "habitat_irrigation_area", "south": "habitat_sleeping_quarters"}, 
+        []),
+    "habitat_irrigation_area": Room("habitat_irrigation_area", "You are in the habitat irrigation area. A row of empty planters lines the wall.", {"north": "habitat_storage_room", "south": "habitat_air_lock"}, 
+        [items["withered_plant"], items["soil_kit"]]),
+    "habitat_sleeping_quarters": Room("habitat_sleeping_quarters", "You are in the habitat sleeping quarters. A gaping hole in the wall reveals the red landscape.", {"north": "habitat_air_lock", "east": "south_debris"}, 
+        [items["halbergs_datapad"]]),
+    "habitat_storage_room": Room("habitat_storage_room", "You are in the habitat storage room. Most of the contents have been sucked out through a tear in the hull.", {"south": "habitat_irrigation_area", "east": "north_debris"}, 
+        []),
+    "rover_pad": Room("rover_pad", "You are in the rover pad, your only sanctuary from the storm.", {"north": "rover_launch_bay"}, 
+        [items["small_wrench"]]),
+    "old_rover_pad": Room("old_rover_pad", "You are at the old rover pad. It looks like it hasn't been used for years.", {"west": "north_debris"}, 
+        [items["old_rover_tracks"]]),
 }
 
 def validate_game_world():
@@ -369,14 +415,19 @@ class Game:
         self.running = True
         self.commands = {
             "move": self.command_move,
+            "go": self.command_move,
             "look": self.command_look,
             "inventory": self.command_inventory,
+            "i": self.command_inventory,
             "take": self.command_take,
             "pickup": self.command_take,
+            "get": self.command_take,
             "use": self.command_use,
             "help": self.command_help,
+            "quit": self.command_exit,
             "exit": self.command_exit,
             "inspect": self.command_inspect,
+            "examine": self.command_inspect,
         }
 
     def start(self):
@@ -384,7 +435,7 @@ class Game:
             print(self.rooms[self.player.current_room].description)
             while self.running:
                 command_input = input("\n> ").strip().lower()
-                if not self.running: break # Check if game has ended mid-command
+                if not self.running: break
                 self.handle_command(command_input)
                 if len(self.player.moves) == 3 and not self.player.flags.get("three_move_cutscene_played"):
                     Cutscene([
@@ -420,8 +471,8 @@ class Game:
     def command_move(self, args):
         try:
             if not args:
-                raise GameError("Move where?")
-            self.player.move(args[0])
+                raise GameError("Move where? (e.g., move north, move left)")
+            self.player.move(" ".join(args))
         except GameError as e:
             print(f"Move error: {str(e)}")
         except Exception as e:
@@ -465,7 +516,7 @@ class Game:
     def command_use(self, args):
         try:
             if not args:
-                raise GameError("Use what on what?")
+                raise GameError("Use what on what? (e.g., use spanner on briefcase)")
                 
             if "on" not in args:
                 raise GameError("Syntax: use <item> on <target>")
@@ -516,21 +567,20 @@ class Game:
             # Handle item requirements
             if target.requires and tool.name in target.requires:
                 print(f"You used {tool.name} on {target.name}.")
-                print(f"{target.name} opens, revealing:")
-                for content_name in target.contains:
-                    content = items.get(content_name)
-                    if not content:
-                        continue
-                    if in_inventory:
+                if target.contains:
+                    print(f"{target.name} opens, revealing:")
+                    for content_name in target.contains:
+                        content = items.get(content_name)
+                        if not content:
+                            continue
+                        # Put the new item in the player's inventory, not the room
                         self.player.inventory.append(content)
                         print(f"- {content.name} (added to inventory)")
+                    # Remove the used-up container from wherever it was
+                    if in_inventory:
+                        self.player.inventory.remove(target)
                     else:
-                        room.items.append(content)
-                        print(f"- {content.name} (dropped in the room)")
-                if in_inventory:
-                    self.player.inventory.remove(target)
-                else:
-                    room.items.remove(target)
+                        room.items.remove(target)
                 return
 
             print(f"Using {tool.name} on {target.name} did nothing.")
@@ -628,8 +678,10 @@ class Game:
     def command_help(self, args):
         try:
             print("Available commands:")
-            for cmd in self.commands:
-                print(f"- {cmd}")
+            # Sort the commands for easier reading
+            for cmd in sorted(list(set(self.commands.values()))):
+                aliases = [k for k, v in self.commands.items() if v == cmd]
+                print(f"- {', '.join(aliases)}")
         except Exception as e:
             print(f"Help command failed: {str(e)}")
 
@@ -646,12 +698,15 @@ class Game:
                 raise GameError("Inspect what?")
                 
             item_name = " ".join(args)
+            # Check inventory first
             item = next((i for i in self.player.inventory if i.name.lower() == item_name.lower()), None)
+            # If not in inventory, check the room
             if not item:
-                room = self.rooms[self.player.current_room]
+                room = self.rooms.get(self.player.current_room)
                 if not room:
                     raise GameError("Current room not found")
                 item = next((i for i in room.items if i.name.lower() == item_name.lower()), None)
+            
             if not item:
                 raise GameError(f"There is no '{item_name}' here or in your inventory")
                 
@@ -664,7 +719,6 @@ class Game:
 
 if __name__ == "__main__":
     try:
-        # Validate game world before starting
         if not validate_game_world():
             print("Critical errors in game world setup. Exiting.")
             exit(1)
@@ -673,7 +727,7 @@ if __name__ == "__main__":
         intro = Cutscene([
         "Sol 37. The storm hit harder than anything predicted.",
         "The habitat collapsed. You're the only one who made it to the rover in time.",
-        "Power is out. Oxygen is dropping. You have to get back inside..."
+        "Power is out. Oxygen is dropping. You have to get inside..."
         ], speed=0.04, lineDelay=2)
         intro.play()
 
