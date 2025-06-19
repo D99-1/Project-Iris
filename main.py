@@ -1,21 +1,27 @@
+## Start Dhyan's Code
+
 import time
 import random
+# library for fuzzy spellcheck
 import difflib
 
+# Class to create exceptions for game errors
 class GameError(Exception):
     pass
 
+# Class to define colours for coloured terminal output
 class Colors:
     RESET = "\033[0m"
     RED = "\033[31m"
     GREEN = "\033[32m"
     YELLOW = "\033[33m"
-    BLUE = "\033[34m"
+    BLUE = "\033[94m"
     MAGENTA = "\033[35m"
     CYAN = "\033[36m"
     BOLD = "\033[1m"
     UNDERLINE = "\033[4m"
 
+# main player class
 class Player:
     def __init__(self, name, rooms):
         self.name = name
@@ -23,14 +29,18 @@ class Player:
         self.current_room = "rover_pad"
         self.inventory = []
         self.facing_direction = "north"
-        self.moves = []
+        self.move_count = 0
+        # flags to track game events and states
         self.flags = {
             "comms_unlocked": False,
             "old_rover_alive": True,
             "has_working_antenna": False,
             "three_move_cutscene_played": False,
+            "iris_broken": False,
+            "entered_airlock_from_door": False,
         }
-
+# This game has a special movement system where movement is relative to the player's facing direction.
+# The player can move forward, backward, left, or right relative to their current facing direction
     def get_absolute_direction(self, facing, relative_direction):
         try:
             direction_aliases = {
@@ -45,12 +55,11 @@ class Player:
                     relative_direction = key
                     break
             else:
-                if relative_direction in ["north", "south", "east", "west"]:
-                    return relative_direction
-                raise GameError(f"Invalid direction: {relative_direction}")
+                # Only allow relative directions
+                raise GameError(f"Invalid direction: {relative_direction}. Use forward/back/left/right.")
             
             directions = ["north", "east", "south", "west"]
-            offsets = {"front": 0, "right": 1, "back": 2, "left": -1}
+            offsets = {"front": 0, "right": 1, "back": 2, "left": 3}
             
             if facing not in directions:
                 raise GameError(f"Invalid facing direction: {facing}")
@@ -60,12 +69,29 @@ class Player:
             return directions[abs_index]
             
         except Exception as e:
-            raise GameError(f"Direction calculation failed: {str(e)}")
+            raise GameError(f"Error occurred while trying to move: {str(e)}")
+            
+    def get_relative_direction(self, absolute_direction):
+        directions = ["north", "east", "south", "west"]
+        if absolute_direction not in directions:
+            return absolute_direction
+            
+        facing_index = directions.index(self.facing_direction)
+        exit_index = directions.index(absolute_direction)
+        diff = (exit_index - facing_index) % 4
+        if diff == 0:
+            return "forward"
+        elif diff == 1:
+            return "right"
+        elif diff == 2:
+            return "back"
+        elif diff == 3:
+            return "left"
 
     def move(self, direction):
         try:
             if not direction:
-                raise GameError("Please specify a direction to move")
+                raise GameError("Please specify a direction to move (forward/back/left/right)")
                 
             room = self.rooms.get(self.current_room)
             if not room:
@@ -74,9 +100,15 @@ class Player:
             absolute_direction = self.get_absolute_direction(self.facing_direction, direction.lower().strip())
 
             if absolute_direction not in room.exits:
-                raise GameError(f"Cannot move {absolute_direction} from {self.current_room}")
+                raise GameError(f"Cannot move {direction} from {self.current_room}")
                 
             new_room_name = room.exits[absolute_direction]
+
+            # Track if entering airlock from door
+            if self.current_room == "exit_hatch" and new_room_name == "open_area":
+                self.flags["entered_airlock_from_door"] = True
+            elif new_room_name == "exit_hatch" and self.current_room == "open_area":
+                self.flags["entered_airlock_from_door"] = True
 
             # Handle special room cases
             if new_room_name == "communications_room" and not self.flags.get("comms_unlocked"):
@@ -95,15 +127,18 @@ class Player:
                     print(f"You decide to stay {'inside' if room.name != 'open_area' else 'outside'}.")
                     return
                 
-                cutscene_text = ["Depressurising the airlock..."] if room.name != "open_area" else ["Entering the spaceship..."]
-                Cutscene(cutscene_text, speed=0.5, lineDelay=1).play()
+                # Only play cutscene if entering from the door
+                if self.flags["entered_airlock_from_door"]:
+                    cutscene_text = ["Depressurising the airlock..."] if room.name != "open_area" else ["Entering the spaceship..."]
+                    Cutscene(cutscene_text, speed=0.5, lineDelay=1).play()
                 
                 self.current_room = "open_area" if room.name != "open_area" else "exit_hatch"
-                self.facing_direction = "west" if room.name != "open_area" else "east"
-                self.moves.append(self.current_room)
+                self.facing_direction = "west"
+                self.move_count += 1
                 print(self.rooms[self.current_room].description)
                 
-                if room.name != "open_area":
+                # Only trigger cutscene if entered from door
+                if room.name != "open_area" and self.flags["entered_airlock_from_door"]:
                     self.flags["three_move_cutscene_played"] = True
                 return
                 
@@ -114,19 +149,20 @@ class Player:
                     "You can hear a faint hum as you get closer."
                 ], speed=0.04, lineDelay=2).play()
                 Cutscene(old_rover.dialogue, speed=0.04, lineDelay=2).play()
-                old_rover.interaction()
+                old_rover.interaction(self)
 
             # Update player position
             self.current_room = new_room_name
             self.facing_direction = absolute_direction
             print(self.rooms[self.current_room].description)
-            self.moves.append(self.current_room)
+            self.move_count += 1
             
         except GameError as e:
             print(f"Movement error: {str(e)}")
         except Exception as e:
             print(f"Unexpected movement error: {str(e)}")
 
+# look command, list items in current room
     def look(self):
         try:
             room = self.rooms.get(self.current_room)
@@ -146,6 +182,7 @@ class Player:
         except Exception as e:
             print(f"Unexpected look error: {str(e)}")
 
+# view items in inventory
     def view_inventory(self): 
         try:
             if not self.inventory:
@@ -157,7 +194,24 @@ class Player:
                     
         except Exception as e:
             print(f"Error viewing inventory: {str(e)}")
+    # get possible movement directions from current room
+    def get_room_exits(self):
+        """Get exits in relative directions"""
+        room = self.rooms.get(self.current_room)
+        if not room:
+            return {}
+            
+        relative_exits = {}
+        for abs_dir, room_name in room.exits.items():
+            rel_dir = self.get_relative_direction(abs_dir)
+            relative_exits[rel_dir] = room_name
+            
+        return relative_exits
+## End Dhyan's Code
 
+## Start Saatvik's Code
+
+# Item class to define items in the game
 class Item:
     def __init__(self, name, description, requires=None, interactions=None, contains=None):
         self.name = name
@@ -172,6 +226,7 @@ class Item:
         except Exception:
             return f"{Colors.YELLOW}{self.description}{Colors.RESET}"
 
+# Room class to define rooms in the game
 class Room:
     def __init__(self, name, description, exits, items=None):
         self.name = name
@@ -179,6 +234,7 @@ class Room:
         self.exits = exits
         self.items = items or []
 
+# Cutscene class to handle cutscenes in the game
 class Cutscene:
     def __init__(self, text=None, speed=0.03, lineDelay=1):
         self.text = text if isinstance(text, list) else [str(text)] if text else []
@@ -198,6 +254,7 @@ class Cutscene:
         except Exception:
             print("\n<Cutscene playback failed>\n")
 
+# NPC class to define non-player characters in the game
 class NPC:
     def __init__(self, name, description, dialogue, interaction):
         self.name = name
@@ -205,6 +262,7 @@ class NPC:
         self.dialogue = dialogue
         self.interaction = interaction
 
+# Function to handle interaction with the Old Rover
 def interact_old_rover(player):
     try:
         lines = [
@@ -244,6 +302,11 @@ def interact_old_rover(player):
     except Exception:
         print("Rover interaction failed")
 
+## End Saatvik's Code
+
+## Start Dhyan's Code
+
+# Creating all items in the game
 items = { 
     "sticky_note": Item("Sticky Note", "A dusty yellow sticky-note", 
                        interactions={'inspect': "\"don't forget the password!\nEMBER-IRIS-8924\n      — Halberg\""}),
@@ -301,8 +364,11 @@ items = {
                     interactions={"inspect": "The last analysis reads: 'Sample 42. High iron-oxide content. Trace organic compounds... anomalous reading detected. Recommend further investigation.'"}),
     "old_rover_tracks": Item("Old Rover Tracks", "Deep tracks in the dust.", 
                             interactions={"inspect": "These tracks lead away from the pad and into the vast Martian landscape. The Old Rover has been busy."}),
+    "halberg_log": Item("Halberg Log", "A personal log from Dr. Halberg", 
+                       interactions={"inspect": "Halberg's Personal Log:\n\n...technical notes about the IRIS system...\n\nIMPORTANT CALIBRATION PARAMETERS:\n- Auxiliary power to life-support (option 2)\n- Gravimetric field at 77.3 GHz (option 1)\n- Coolant system vent externally (option 1)\n\nThese settings seem to stabilize the prototype..."}),
 }
 
+# Creating all rooms in the game
 rooms = {
     "center": Room("center", "You are in the center of the ship, a nexus connecting the main sections.", 
                   {"west": "communications_room", "east": "storage_room", "north": "control_room", "south": "engine_room"}, 
@@ -320,7 +386,7 @@ rooms = {
                        {"north": "center", "west": "exit_hatch", "east": "rover_launch_bay"}, 
                        [items["unstable_power_cell"], items["oily_rag"]]),
     "rover_launch_bay": Room("rover_launch_bay", "You are in the rover launch bay. A fine layer of red dust covers everything.", 
-                            {"north": "storage_room", "west": "engine_room"}, 
+                            {"north": "storage_room", "west": "engine_room", "south": "rover_pad"}, 
                             []),
     "exit_hatch": Room("exit_hatch", "You are at the exit hatch. The outer door is sealed tight.", 
                       {"north": "communications_room", "east": "engine_room"}, 
@@ -330,7 +396,7 @@ rooms = {
                      [items["strange_rock"]]),
     "south_debris": Room("south_debris", "You are in the south debris area, amidst twisted metal from the habitat.", 
                         {"north": "open_area", "west": "habitat_sleeping_quarters"}, 
-                        [items["scorched_panel"], items["torn_clothing"]]),
+                        [items["scorched_panel"], items["torn_clothing"], items["halberg_log"]]),  # Added Halberg Log
     "north_debris": Room("north_debris", "You are in the north debris area. This seems to be where supplies were offloaded.", 
                         {"south": "open_area", "west": "habitat_storage_room", "east": "old_rover_pad"}, 
                         [items["mre"], items["old_air_filter"], items["north_metal_scraps"], items["sealed_briefcase"], items["rusty_spanner"]]),
@@ -354,6 +420,11 @@ rooms = {
                          [items["old_rover_tracks"]]),
 }
 
+## End Dhyan's Code
+
+## Start Saatvik's Code
+
+# Create the npc
 old_rover = NPC(
     name="Old Rover",
     description=f"{Colors.GREEN}A battered exploration unit with an intact antenna. It hums faintly as you approach. {Colors.RESET}",
@@ -362,9 +433,14 @@ old_rover = NPC(
         f"{Colors.GREEN}Old Rover: Most of my memory banks are corrupted... but I remember the stars. {Colors.RESET}",
         f"{Colors.GREEN}Old Rover: My antenna still works... keeps me connected to the sky. {Colors.RESET}"
     ],
-    interaction=lambda player: interact_old_rover(player)  # Fixed player reference
+    interaction=interact_old_rover
 )
 
+## End Saatvik's Code
+
+## Start Dhyan's Code
+
+# Main game class to handle the game logic
 class Game:
     def __init__(self, player, rooms):
         self.player = player
@@ -387,7 +463,6 @@ class Game:
             # Inventory
             "inventory": self.command_inventory,
             "inv": self.command_inventory,
-            "i": self.command_inventory,
             "e": self.command_inventory,
             
             # Interaction
@@ -400,18 +475,16 @@ class Game:
             "inspect": self.command_inspect,
             "ins": self.command_inspect,
             "examine": self.command_inspect,
-            "exam": self.command_inspect,
+            "i": self.command_inspect,
             
             # System
             "help": self.command_help,
             "h": self.command_help,
             "?": self.command_help,
-            "quit": self.command_exit,
-            "q": self.command_exit,
-            "exit": self.command_exit
         }
         self.pending_command = None
 
+# Start the game
     def start(self):
         try:
             print(self.rooms[self.player.current_room].description)
@@ -421,9 +494,7 @@ class Game:
                     if not command_input:
                         continue
                     
-                    # Handle pending command continuation
                     if self.pending_command:
-                        # If user enters a base command, override pending command
                         if command_input.split()[0] in self.commands:
                             self.pending_command = None
                             self.handle_command(command_input)
@@ -434,8 +505,7 @@ class Game:
                     else:
                         self.handle_command(command_input)
                     
-                    # Trigger 3-move cutscene
-                    if len(self.player.moves) == 3 and not self.player.flags.get("three_move_cutscene_played"):
+                    if self.player.move_count == 3 and not self.player.flags.get("three_move_cutscene_played") and self.player.flags["entered_airlock_from_door"]:
                         Cutscene([
                             "The dust storm sure hit hard... ",
                             "You should probably check if something is damaged outside, ",
@@ -450,7 +520,7 @@ class Game:
             print(f"Critical game error: {str(e)}")
             print("Game session terminated unexpectedly.")
 
-
+# Handle commands input by the player
     def handle_command(self, command_input):
         if not command_input:
             return
@@ -463,7 +533,6 @@ class Game:
             if command in self.commands:
                 self.commands[command](args)
             else:
-                # Spelling suggestion for commands
                 suggestions = difflib.get_close_matches(command, self.commands.keys(), n=1, cutoff=0.6)
                 if suggestions:
                     print(f"{Colors.RED}Command not found. Did you mean '{Colors.YELLOW}{suggestions[0]}{Colors.RED}'?{Colors.RESET}")
@@ -474,12 +543,12 @@ class Game:
             print(f"Error: {str(e)}")
         except Exception as e:
             print(f"Unexpected command error: {str(e)}")
-
+# handlers for each command
     def command_move(self, args):
         try:
             if not args:
                 self.pending_command = "move"
-                raise GameError("Move where? (e.g., north, left)")
+                raise GameError("Move where? (forward/back/left/right)")
                 
             self.player.move(" ".join(args))
         except GameError as e:
@@ -499,7 +568,6 @@ class Game:
         except Exception as e:
             print(f"Inventory command failed: {str(e)}")
 
-
     def command_take(self, args):
         try:
             if not args:
@@ -511,20 +579,15 @@ class Game:
             if not room:
                 raise GameError("Current room not found")
             
-            # Get available items for spellcheck
             available_items = [item.name.lower() for item in room.items]
-            inventory_items = [item.name.lower() for item in self.player.inventory]
             
-            # Check if item exists
             item = next((i for i in room.items if i.name.lower() == item_name.lower()), None)
             if not item:
-                # Spellcheck suggestion
                 suggestions = difflib.get_close_matches(item_name, available_items, n=1, cutoff=0.5)
                 if suggestions:
                     raise GameError(f"No item named '{item_name}' found. Did you mean '{suggestions[0]}'?")
                 raise GameError(f"No item named '{item_name}' found here")
                 
-            # Check if item already in inventory
             if any(i.name.lower() == item_name.lower() for i in self.player.inventory):
                 raise GameError(f"You already have {item.name}")
                 
@@ -537,6 +600,9 @@ class Game:
         except Exception as e:
             print(f"Unexpected take error: {str(e)}")
 
+    ## End Dhyan's Code
+
+    ## Start Saatvik's Code
 
     def command_use(self, args):
         try:
@@ -556,8 +622,11 @@ class Game:
             if not tool:
                 raise GameError(f"You don't have an item named '{item_name}'")
 
-            # Handle IRIS activation
             if tool.name == "Unstable Power Cell" and target_name.lower() == "iris":
+                if self.player.flags.get("iris_broken"):
+                    print(f"{Colors.RED}The IRIS device is completely destroyed and cannot be used.{Colors.RESET}")
+                    return
+                    
                 target_in_inventory = next((i for i in self.player.inventory if i.name.lower() == "iris"), None)
                 if target_in_inventory:
                     self.trigger_iris_ending()
@@ -575,25 +644,23 @@ class Game:
             if not target:
                 raise GameError(f"There is no '{target_name}' here or in your inventory")
 
-            # Emergency Beacon win condition
             if tool.name == "Antenna" and target.name == "Emergency Beacon":
                 Cutscene([
-                    "You attach the antenna onto the emergency beacon.",
-                    "The red error light turns blue and then... it turns green.",
-                    "A faint buzzing sound confirms the signal is broadcasting.",
-                    "Now it's just a matter of waiting...",
+                    "You attach the antenna onto the emergency beacon. ",
+                    "The red error light turns blue and then... it turns green. ",
+                    "A faint buzzing sound confirms the signal is broadcasting. ",
+                    "Now it's just a matter of waiting... ",
                     "",
-                    "Hours pass.",
-                    "Then... a sound. A voice crackles through the comms.",
-                    "\"We received your signal. Help is on the way.\"",
-                    "You're going home."
+                    "Hours pass. ",
+                    "Then... a sound. A voice crackles through the comms. ",
+                    "\"We received your signal. Help is on the way.\" ",
+                    "You're going home. "
                 ], speed=0.04, lineDelay=2).play()
-                print("=== GAME END ===")
+                print("=== ENDING: RESCUED ===")
                 self.running = False
                 return
 
-            # Handle item requirements
-            if target.requires and tool.name in target.requires:
+            if target.requires and any(tool.name == req for req in target.requires):
                 print(f"You used {tool.name} on {target.name}.")
                 if target.contains:
                     print(f"{target.name} opens, revealing:")
@@ -603,7 +670,6 @@ class Game:
                             continue
                         self.player.inventory.append(content)
                         print(f"- {content.name} (added to inventory)")
-                    # Remove the used-up container
                     if in_inventory:
                         self.player.inventory.remove(target)
                     else:
@@ -617,13 +683,18 @@ class Game:
         except Exception as e:
             print(f"Unexpected use error: {str(e)}")
 
+    ## End Saatvik's Code
+
+    ## Start Dhyan's Code
+
+# special logic for the IRIS device ending
     def trigger_iris_ending(self):
         Cutscene([
-            "You slot the humming power cell into the IRIS device.",
-            "The screen flickers to life, bathing you in a cold, blue light.",
-            "IRIS: 'Primary power detected. Life support protocol IRIS now active.'",
-            "IRIS: 'Calibration required. Please respond to prompts to stabilize system core.'",
-            "IRIS: 'Failure to comply may result in... unintended consequences.'"
+            "You slot the humming power cell into the IRIS device. ",
+            "The screen flickers to life, bathing you in a cold, blue light. ",
+            "IRIS: 'Primary power detected. Life support protocol IRIS now active. '",
+            "IRIS: 'Calibration required. Please respond to prompts to stabilize system core. '",
+            "IRIS: 'Failure to comply may result in... unintended consequences. '"
         ], speed=0.04, lineDelay=2).play()
 
         calibration_success = True
@@ -672,8 +743,9 @@ class Game:
                         "The spaceship's hull groans, not from the wind, but from a shadow falling over it.",
                         "You look out the viewport to see something vast and dark descending from the Martian sky.",
                         "IRIS attracted the wrong kind of attention.",
-                        "\n=== ENDING: UNEXPECTED RESCUE ==="
+                        "\n=== ENDING: ALIENS ==="
                     ], speed=0.04, lineDelay=2).play()
+                    self.running = False
                 else:
                     Cutscene([
                         "IRIS: 'Activation complete. Biostabilization commencing.'",
@@ -681,8 +753,9 @@ class Game:
                         "Your vision is filled with a serene, endless blue light.",
                         "You are safe. Preserved. Waiting for a rescue that may never come.",
                         "You are immortal on the red planet. Forever.",
-                        "\n=== ENDING: THE LONELY IMMORTAL ==="
+                        "\n=== ENDING: SURVIVING, ALONE ==="
                     ], speed=0.04, lineDelay=2).play()
+                    self.running = False
                 break
             elif choice == '2' and has_spanner:
                 Cutscene([
@@ -690,43 +763,45 @@ class Game:
                     "Sparks erupt as metal screams against plastic.",
                     "IRIS: 'ERROR! ERROR! SUBJECT NON-COMPLIANT! CATASTROPHIC-'",
                     "The light from the device dies with a final, pathetic flicker.",
-                    "Silence returns to the rover. You are alone again, the silence deeper than before.",
-                    "You chose your own fate, for better or worse.",
-                    "\n=== ENDING: A DEFIANT FATE ==="
+                    "The IRIS device is completely destroyed.",
+                    "You stand alone in the silence."
                 ], speed=0.04, lineDelay=2).play()
+                # Remove IRIS and power cell from inventory
+                self.player.inventory = [item for item in self.player.inventory 
+                                       if item.name not in ["Iris", "Unstable Power Cell"]]
+                self.player.flags["iris_broken"] = True
                 break
             else:
                 print("Invalid choice. Please enter 1" + (" or 2" if has_spanner else ""))
 
-        self.running = False
+    ## End Dhyan's Code
+
+    ## Start Saatvik's Code
 
     def command_help(self, args):
         try:
             print(f"{Colors.BOLD}Available commands:{Colors.RESET}")
             print(f"{Colors.CYAN}-------------------{Colors.RESET}")
             
-            # Grouped command explanations
             help_sections = {
                 "Movement": [
-                    ("move/go/g/m <direction>", "Navigate in a direction (north/south/left/etc)"),
+                    ("move/go/g/m <direction>", "Navigate in a direction (forward/back/left/right)"),
                     ("exits/ex", "Show available exits from current location")
                 ],
                 "Observation": [
                     ("look/l/whereami", "View current location description"),
-                    ("inspect/ins/exam/i <item>", "Examine an item closely")
+                    ("inspect/ins/i <item>", "Examine an item closely")
                 ],
                 "Inventory": [
-                    ("inventory/inv/e/i", "View your carried items"),
+                    ("inventory/inv/e", "View your carried items"),
                     ("take/t/pickup <item>", "Pick up an item"),
                     ("use/u <item> on <target>", "Use an item on something")
                 ],
                 "System": [
-                    ("help/h/?", "Show this help screen"),
-                    ("quit/q/exit", "Exit the game")
-                ]
+                    ("help/h/?", "Show this help screen")                
+                    ]
             }
             
-            # Print grouped commands
             for category, commands in help_sections.items():
                 print(f"\n{Colors.BOLD}{category}:{Colors.RESET}")
                 for cmd, desc in commands:
@@ -734,20 +809,17 @@ class Game:
                     print(f"      {desc}")
             
             print(f"\n{Colors.YELLOW}Examples:{Colors.RESET}")
-            print(f"  {Colors.CYAN}m north{Colors.RESET} - Move north")
-            print(f"  {Colors.CYAN}t spanner{Colors.RESET} - Pick up the rusty spanner")
-            print(f"  {Colors.CYAN}i beacon{Colors.RESET} - Inspect the emergency beacon")
-            print(f"  {Colors.CYAN}u antenna on beacon{Colors.RESET} - Use antenna on beacon")
+            print(f"  {Colors.CYAN}move forward{Colors.RESET} - Move forward")
+            print(f"  {Colors.CYAN}take spanner{Colors.RESET} - Pick up the rusty spanner")
+            print(f"  {Colors.CYAN}inspect beacon{Colors.RESET} - Inspect the emergency beacon")
+            print(f"  {Colors.CYAN}use antenna on beacon{Colors.RESET} - Use antenna on beacon")
             
         except Exception as e:
             print(f"Help command failed: {str(e)}")
 
-    def command_exit(self, args):
-        try:
-            print("Exiting game.")
-            self.running = False
-        except Exception as e:
-            print(f"Exit command failed: {str(e)}")
+    ## End Saatvik's Code
+
+    ## Start Dhyan's Code
 
     def command_exits(self, args):
         try:
@@ -755,14 +827,20 @@ class Game:
             if not room:
                 raise GameError("Current room not found")
                 
-            if not room.exits:
+            relative_exits = self.player.get_room_exits()
+            
+            if not relative_exits:
                 print("There are no visible exits from this location.")
             else:
                 print("Available exits:")
-                for direction, target in room.exits.items():
+                for direction, target in relative_exits.items():
                     print(f"- {direction.capitalize()} to {target.replace('_', ' ').title()}")
         except Exception as e:
             print(f"Error showing exits: {str(e)}")
+
+    ## End Dhyan's Code
+
+    ## Start Saatvik's Code
 
     def command_inspect(self, args):      
         try:
@@ -775,14 +853,11 @@ class Game:
             if not room:
                 raise GameError("Current room not found")
             
-            # Check inventory first
             item = next((i for i in self.player.inventory if i.name.lower() == item_name.lower()), None)
-            # If not in inventory, check the room
             if not item:
                 item = next((i for i in room.items if i.name.lower() == item_name.lower()), None)
             
             if not item:
-                # Spellcheck for items
                 available_items = [item.name.lower() for item in room.items]
                 inventory_items = [item.name.lower() for item in self.player.inventory]
                 all_items = available_items + inventory_items
@@ -799,44 +874,13 @@ class Game:
         except Exception as e:
             print(f"Unexpected inspect error: {str(e)}")
 
-def validate_game_world():
-    """Comprehensive world validation"""
-    try:
-        room_names = set(rooms.keys())
-        errors = []
-        
-        # Validate room exits
-        for room_name, room in rooms.items():
-            for direction, target_room in room.exits.items():
-                if target_room not in room_names:
-                    errors.append(f"Room '{room_name}' has invalid exit: '{target_room}' doesn't exist")
-        
-        # Validate item references
-        for room in rooms.values():
-            for item in room.items:
-                if item.name not in [i.name for i in items.values()]:
-                    errors.append(f"Room '{room.name}' contains unknown item: '{item.name}'")
-        
-        # Validate NPC existence
-        if "old_rover" not in globals():
-            errors.append("NPC 'Old Rover' is not defined")
-        
-        if errors:
-            print(f"{Colors.RED}Game world errors:{Colors.RESET}")
-            for error in errors:
-                print(f"  - {error}")
-            return False
-                
-        return True
-    except Exception as e:
-        print(f"{Colors.RED}Validation error: {str(e)}{Colors.RESET}")
-        return False
+    ## End Saatvik's Code
+
+    ## Start Dhyan's Code
+
 
 if __name__ == "__main__":
     try:
-        if not validate_game_world():
-            print(f"{Colors.RED}Critical errors in game world setup. Exiting.{Colors.RESET}")
-            exit(1)
             
         player = Player("Player1", rooms)
         intro = Cutscene([
@@ -852,3 +896,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"{Colors.RED}Fatal error: {str(e)}{Colors.RESET}")
         print(f"{Colors.RED}Game cannot start.{Colors.RESET}")
+
+        ## End Dhyan's Code
